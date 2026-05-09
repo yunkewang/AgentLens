@@ -124,22 +124,27 @@ The scanner is:
 
 ## Usage
 
-### Install
+> AgentLens is not yet published to npm. For now, install it by cloning and building this repository locally (see below). Once published, you'll be able to install it globally with `npm install -g agentlens` or run it directly with `npx agentlens`.
+
+### Local Development Usage
+
+Clone and build AgentLens locally:
 
 ```bash
-npm install -g agentlens
+git clone https://github.com/yunkewang/agentlens
+cd agentlens
+npm install
+npm run build
+npm install -g .
 ```
 
-Or run without installing:
+This installs the `agentlens` command globally on your machine.
 
-```bash
-npx agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
-open ./agentlens-report-neon/report.html
-```
+### Running AgentLens Against a Target Repo
 
-### Quick Start
+You do **not** need to clone the target repository yourself. AgentLens accepts a public GitHub URL directly, clones the target repo internally into a temporary directory, scans it, and writes a self-contained HTML report to the `--out` directory.
 
-**Scan a public GitHub repo:**
+**Scan a public GitHub repo (recommended):**
 
 ```bash
 agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
@@ -155,23 +160,16 @@ agentlens build ./my-repo --out ./agentlens-report
 open ./agentlens-report/report.html
 ```
 
-### Development Setup (from source)
+### Future npm Usage
+
+Once AgentLens is published to npm, no local clone or build will be required:
 
 ```bash
-git clone https://github.com/yunkewang/agentlens
-cd agentlens
-npm install
-npm run build
-npm link
-```
+# Install globally
+npm install -g agentlens
 
-During local development, run `npm link` once to make the `agentlens` command available on your machine.
-
-Then:
-
-```bash
-agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
-open ./agentlens-report-neon/report.html
+# Or run without installing
+npx agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
 ```
 
 ### Commands
@@ -228,7 +226,7 @@ The Instruction Map and the Agent Readiness Score remain focused on agent instru
 
 ### Troubleshooting
 
-If `agentlens` is not found after `npm install -g`, either run `npm link` from the AgentLens repo root (development installs), or invoke the CLI directly:
+If `agentlens` is not found after `npm install -g .`, you can either re-run the install from the AgentLens repo root, or invoke the CLI directly from the build output:
 
 ```bash
 node dist/cli.js build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
