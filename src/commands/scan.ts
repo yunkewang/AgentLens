@@ -32,7 +32,8 @@ export async function runScan(
     repoName = repoNameFromPath(repoPath);
   }
 
-  const outputDir = resolveOutputDir(repoPath, options.out);
+  const defaultOutputDir = path.resolve('output', repoName);
+  const outputDir = resolveOutputDir(repoPath, options.out, defaultOutputDir);
 
   logger.info(`\nScanning ${repoSource} ...`);
 

@@ -15,8 +15,8 @@ No backend. No account. No source upload. The report works offline as a portable
 For the best first impression, use a repo with multiple agent artifacts. Minimal repos may only produce a small report, while richer Claude Code repos better demonstrate AgentLens' ability to map instructions, rules, skills, MCP configs, prompts, security findings, and remediation guidance.
 
 ```bash
-agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
-open ./agentlens-report-claude-code/report.html
+agentlens build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code
+open ./output/agentlens-report-claude-code/report.html
 ```
 
 ```
@@ -40,7 +40,7 @@ Security Review:
   - Info: 4
 
 Report:
-  ./agentlens-report-claude-code/report.html
+  ./output/agentlens-report-claude-code/report.html
 ```
 
 The generated report includes the following sections:
@@ -191,17 +191,19 @@ You do **not** need to manually clone the target repository. AgentLens accepts a
 **Scan a public GitHub repo (recommended):**
 
 ```bash
-agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
-open ./agentlens-report-claude-code/report.html
+agentlens build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code
+open ./output/agentlens-report-claude-code/report.html
 ```
 
-This writes the interactive HTML report to `./agentlens-report-claude-code/report.html`.
+This writes the interactive HTML report to `./output/agentlens-report-claude-code/report.html`.
+
+If you omit `--out`, AgentLens writes to `./output/<repo-name>` from your current working directory.
 
 **Scan a local repo:**
 
 ```bash
-agentlens build ./my-repo --out ./agentlens-report
-open ./agentlens-report/report.html
+agentlens build ./my-repo --out ./output/agentlens-report
+open ./output/agentlens-report/report.html
 ```
 
 ### Future npm Usage
@@ -213,25 +215,25 @@ Once AgentLens is published to npm, no local clone or build will be required:
 npm install -g agentlens
 
 # Or run without installing
-npx agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
+npx agentlens build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code
 ```
 
 ### Commands
 
 ```bash
 # Build a report for a public GitHub repo
-agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
-open ./agentlens-report-claude-code/report.html
+agentlens build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code
+open ./output/agentlens-report-claude-code/report.html
 
 # Build a report for a local repo
-agentlens build ./my-repo --out ./agentlens-report
-open ./agentlens-report/report.html
+agentlens build ./my-repo --out ./output/agentlens-report
+open ./output/agentlens-report/report.html
 
 # Scan only and write manifest.json
-agentlens scan ./my-repo --out ./agentlens-scan
+agentlens scan ./my-repo --out ./output/agentlens-scan
 
 # Build and serve the report through a local web server
-agentlens serve https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code --port 4321
+agentlens serve https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code --port 4321
 ```
 
 **`build`** generates `report.html` and `manifest.json` in the output folder.
@@ -256,8 +258,8 @@ Remote GitHub URL scanning supports public repos only. Private repos can be scan
 By default, AgentLens focuses on the agent instruction layer. To also include README and Markdown documentation, use:
 
 ```bash
-agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code --include-docs
-open ./agentlens-report-claude-code/report.html
+agentlens build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code --include-docs
+open ./output/agentlens-report-claude-code/report.html
 ```
 
 This is useful when you want the report to explain how the project works, not just its agent rules and skills.
@@ -273,8 +275,8 @@ The Instruction Map and the Agent Readiness Score remain focused on agent instru
 If `agentlens` is not found after `npm install -g .`, you can either re-run the install from the AgentLens repo root, or invoke the CLI directly from the build output:
 
 ```bash
-node dist/cli.js build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
-open ./agentlens-report-claude-code/report.html
+node dist/cli.js build https://github.com/affaan-m/everything-claude-code --out ./output/agentlens-report-claude-code
+open ./output/agentlens-report-claude-code/report.html
 ```
 
 ---

@@ -2,6 +2,9 @@
 node_modules/
 dist/
 .agentlens/
+output/
+exports/
+agentlens-report*/
 *.tsbuildinfo
 tmp/
 .tmp/

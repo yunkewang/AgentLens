@@ -19,5 +19,6 @@ export function resolveOutputDir(
   defaultDir = '.agentlens'
 ): string {
   if (out) return path.resolve(out);
+  if (path.isAbsolute(defaultDir)) return defaultDir;
   return path.join(path.resolve(repoPath), defaultDir);
 }

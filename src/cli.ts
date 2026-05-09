@@ -31,7 +31,7 @@ function parsePositiveInt(label: string) {
 program
   .command('scan <input>')
   .description('Scan a local repo or public GitHub URL and generate manifest.json')
-  .option('-o, --out <path>', 'Output directory (default: <repo>/.agentlens)')
+  .option('-o, --out <path>', 'Output directory (default: ./output/<repo-name>)')
   .option('-v, --verbose', 'Verbose output')
   .option('--include-docs', 'Also include README and Markdown project documentation')
   .option('--max-docs <number>', 'Maximum number of project docs to include (default: 100)', parsePositiveInt('--max-docs'))
@@ -49,7 +49,7 @@ program
 program
   .command('build <input>')
   .description('Scan and generate manifest.json + report.html')
-  .option('-o, --out <path>', 'Output directory (default: <repo>/.agentlens)')
+  .option('-o, --out <path>', 'Output directory (default: ./output/<repo-name>)')
   .option('-v, --verbose', 'Verbose output')
   .option('--include-docs', 'Also include README and Markdown project documentation')
   .option('--max-docs <number>', 'Maximum number of project docs to include (default: 100)', parsePositiveInt('--max-docs'))
@@ -67,7 +67,7 @@ program
 program
   .command('serve <input>')
   .description('Build and serve the report locally in a browser')
-  .option('-o, --out <path>', 'Output directory (default: <repo>/.agentlens)')
+  .option('-o, --out <path>', 'Output directory (default: ./output/<repo-name>)')
   .option('-p, --port <number>', 'Port number (default: 4321)', parseInt)
   .option('-v, --verbose', 'Verbose output')
   .option('--include-docs', 'Also include README and Markdown project documentation')
