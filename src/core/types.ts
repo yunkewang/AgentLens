@@ -3,7 +3,8 @@ export type FileType =
   | 'rule'
   | 'skill'
   | 'mcp_config'
-  | 'prompt';
+  | 'prompt'
+  | 'project_doc';
 
 export type FileSubtype =
   | 'agents_md'
@@ -17,7 +18,13 @@ export type FileSubtype =
   | 'prompt_md'
   | 'command_md'
   | 'rule_md'
+  | 'markdown_doc'
   | 'unknown';
+
+export interface DocHeading {
+  level: number;
+  text: string;
+}
 
 export type RiskSeverity = 'high' | 'medium' | 'low';
 
@@ -30,6 +37,8 @@ export interface Risk {
   path?: string;
 }
 
+export type FindingSource = 'agent_instruction' | 'project_doc';
+
 export interface SecurityFinding {
   severity: SecuritySeverity;
   category: string;
@@ -38,6 +47,7 @@ export interface SecurityFinding {
   path: string;
   evidence?: string;
   recommendation?: string;
+  source?: FindingSource;
 }
 
 export interface SecuritySummary {
@@ -93,11 +103,22 @@ export interface RepoInfo {
   scannedAt: string;
 }
 
+export interface ProjectDocsInfo {
+  enabled: boolean;
+  total: number;
+  scanned: number;
+  skipped: number;
+  maxDocs: number;
+  maxFileSize: number;
+}
+
 export interface Manifest {
   repo: RepoInfo;
   summary: RepoSummary;
   security: SecuritySummary;
   files: AgentFile[];
+  projectDocs?: AgentFile[];
+  projectDocsInfo?: ProjectDocsInfo;
   warnings: Warning[];
 }
 
@@ -105,15 +126,24 @@ export interface ScanOptions {
   out?: string;
   verbose?: boolean;
   silent?: boolean;
+  includeDocs?: boolean;
+  maxDocs?: number;
+  maxFileSize?: number;
 }
 
 export interface BuildOptions {
   out?: string;
   verbose?: boolean;
+  includeDocs?: boolean;
+  maxDocs?: number;
+  maxFileSize?: number;
 }
 
 export interface ServeOptions {
   out?: string;
   port?: number;
   verbose?: boolean;
+  includeDocs?: boolean;
+  maxDocs?: number;
+  maxFileSize?: number;
 }

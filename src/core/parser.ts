@@ -2,7 +2,7 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import path from 'path';
 import { readFile, listDir, statFile } from '../utils/file';
-import type { AgentFile, FileType, FileSubtype } from './types';
+import type { AgentFile, DocHeading, FileType, FileSubtype } from './types';
 
 const PREVIEW_LENGTH = 300;
 
@@ -160,6 +160,65 @@ async function collectFiles(
       result.push(path.relative(baseFolder, full).replace(/\\/g, '/'));
     }
   }
+}
+
+function extractHeadings(content: string): DocHeading[] {
+  const headings: DocHeading[] = [];
+  const lines = content.split('\n');
+  let inFence = false;
+  for (const rawLine of lines) {
+    const fence = rawLine.match(/^\s*(```|~~~)/);
+    if (fence) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const m = rawLine.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if (m) {
+      headings.push({ level: m[1].length, text: m[2].trim() });
+    }
+  }
+  return headings;
+}
+
+function countWords(content: string): number {
+  const stripped = content
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]+`/g, ' ')
+    .replace(/!\[.*?\]\(.*?\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[#>*_~\-]/g, ' ');
+  const tokens = stripped.split(/\s+/).filter(Boolean);
+  return tokens.length;
+}
+
+export async function parseProjectDoc(
+  filePath: string,
+  repoRoot: string
+): Promise<AgentFile> {
+  const raw = await readFile(filePath);
+  const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
+  const headings = extractHeadings(raw);
+  const title = headings.find((h) => h.level === 1)?.text ?? extractTitle(raw) ?? path.basename(filePath);
+  const preview = extractPreview(raw);
+  const rendered = await renderMarkdown(raw);
+  const wordCount = countWords(raw);
+
+  return {
+    type: 'project_doc',
+    subtype: 'markdown_doc',
+    path: relativePath,
+    title,
+    description: 'Project documentation',
+    metadata: {
+      headings,
+      wordCount,
+    },
+    risks: [],
+    contentPreview: preview,
+    rawContent: raw,
+    renderedContent: rendered,
+  };
 }
 
 export async function parseMcpConfig(

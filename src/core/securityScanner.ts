@@ -446,7 +446,10 @@ function checkMissingSecurityGuidance(files: AgentFile[]): SecurityFinding[] {
 // Main export
 // ---------------------------------------------------------------------------
 
-export function runSecurityScan(files: AgentFile[]): SecuritySummary {
+export function runSecurityScan(
+  files: AgentFile[],
+  projectDocs: AgentFile[] = []
+): SecuritySummary {
   const findings: SecurityFinding[] = [];
 
   for (const file of files) {
@@ -463,7 +466,23 @@ export function runSecurityScan(files: AgentFile[]): SecuritySummary {
     }
   }
 
+  for (const doc of projectDocs) {
+    const docFindings: SecurityFinding[] = [
+      ...scanPossibleSecrets(doc),
+      ...scanDangerousCommands(doc),
+      ...scanDataExfiltration(doc),
+      ...scanPrivateEnvironment(doc),
+    ];
+    for (const f of docFindings) {
+      findings.push({ ...f, source: 'project_doc' });
+    }
+  }
+
   findings.push(...checkMissingSecurityGuidance(files));
+
+  for (const f of findings) {
+    if (!f.source) f.source = 'agent_instruction';
+  }
 
   const findingsCount = {
     high: findings.filter((f) => f.severity === 'high').length,

@@ -205,6 +205,26 @@ Remote GitHub URL scanning supports public repos only. Private repos can be scan
 | `-o, --out <path>` | Output directory |
 | `-p, --port <number>` | Port for `serve` command (default: 4321) |
 | `-v, --verbose` | Verbose output |
+| `--include-docs` | Also include README and Markdown project documentation in the report |
+| `--max-docs <number>` | Max project docs to include (default: 100). Requires `--include-docs`. |
+| `--max-file-size <bytes>` | Skip project doc files larger than this many bytes (default: 1048576). Requires `--include-docs`. |
+
+### Include Project Docs
+
+By default, AgentLens focuses on the agent instruction layer. To also include README and Markdown documentation, use:
+
+```bash
+agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon --include-docs
+open ./agentlens-report-neon/report.html
+```
+
+This is useful when you want the report to explain how the project works, not just its agent rules and skills.
+
+When `--include-docs` is enabled, AgentLens also discovers `README.md`, `README.*.md`, and Markdown / MDX files under `docs/`, `guides/`, `examples/`, `.ai/`, `.github/`, and the rest of the repository (excluding `node_modules`, `.git`, `dist`, `build`, `coverage`, `vendor`, `.next`, `out`, `target`, `tmp`, and `temp`). Discovered files are listed in a new **Project Docs** tab and included in `manifest.json` as entries with `"type": "project_doc"`.
+
+> **Note:** Large repositories may contain many Markdown files. AgentLens limits project docs by default and skips generated/build folders. Raise the limits with `--max-docs` and `--max-file-size` if you need to capture more.
+
+The Instruction Map and the Agent Readiness Score remain focused on agent instruction files. Project docs are also passed through the security scanner — findings from project documentation are tagged with `source: "project_doc"` so reviewers can tell them apart from findings on agent instruction files. The "missing security guidance" check still only looks at agent instruction files.
 
 ### Troubleshooting
 
@@ -246,6 +266,7 @@ The HTML report includes:
 | **Rules** | MDC rule files with glob patterns and metadata |
 | **Skills** | Skill folders with SKILL.md and related files |
 | **MCP** | MCP server configs with exposure findings highlighted |
+| **Project Docs** *(when `--include-docs` is used)* | README and Markdown docs grouped by top-level folder, with heading outlines and rendered markdown |
 | **Fix Prompts** | Copyable remediation prompts for each security finding |
 | **Raw Manifest** | Pretty-printed embedded manifest JSON |
 

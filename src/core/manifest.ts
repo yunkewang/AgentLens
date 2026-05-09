@@ -1,16 +1,31 @@
-import type { AgentFile, Manifest, RepoInfo, RepoSummary, Warning } from './types';
+import type {
+  AgentFile,
+  Manifest,
+  ProjectDocsInfo,
+  RepoInfo,
+  RepoSummary,
+  Warning,
+} from './types';
 import { calculateScore, generateWarnings } from './scoring';
 import { runSecurityScan } from './securityScanner';
+
+export interface BuildManifestOptions {
+  extraWarnings?: Warning[];
+  projectDocs?: AgentFile[];
+  projectDocsInfo?: ProjectDocsInfo;
+}
 
 export function buildManifest(
   files: AgentFile[],
   repoSource: string,
   repoName: string,
-  extraWarnings: Warning[] = []
+  options: BuildManifestOptions = {}
 ): Manifest {
+  const { extraWarnings = [], projectDocs, projectDocsInfo } = options;
+
   const scoreResult = calculateScore(files);
   const warnings = [...generateWarnings(files, scoreResult), ...extraWarnings];
-  const security = runSecurityScan(files);
+  const security = runSecurityScan(files, projectDocs);
 
   const counts = {
     genericInstructions: files.filter((f) => f.type === 'generic_instruction').length,
@@ -32,5 +47,10 @@ export function buildManifest(
     counts,
   };
 
-  return { repo, summary, security, files, warnings };
+  const manifest: Manifest = { repo, summary, security, files, warnings };
+  if (projectDocs) {
+    manifest.projectDocs = projectDocs;
+    manifest.projectDocsInfo = projectDocsInfo;
+  }
+  return manifest;
 }
