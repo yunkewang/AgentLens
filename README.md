@@ -133,59 +133,102 @@ npm install -g agentlens
 Or run without installing:
 
 ```bash
-npx agentlens build ./my-repo
+npx agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
+open ./agentlens-report-neon/report.html
 ```
 
-Or build from source:
+### Quick Start
+
+**Scan a public GitHub repo:**
+
+```bash
+agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
+open ./agentlens-report-neon/report.html
+```
+
+This writes the interactive HTML report to `./agentlens-report-neon/report.html`.
+
+**Scan a local repo:**
+
+```bash
+agentlens build ./my-repo --out ./agentlens-report
+open ./agentlens-report/report.html
+```
+
+### Development Setup (from source)
 
 ```bash
 git clone https://github.com/yunkewang/agentlens
 cd agentlens
 npm install
 npm run build
+npm link
+```
+
+During local development, run `npm link` once to make the `agentlens` command available on your machine.
+
+Then:
+
+```bash
+agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
+open ./agentlens-report-neon/report.html
 ```
 
 ### Commands
 
 ```bash
-# Scan a local repo and write manifest.json
-agentlens scan ./my-repo
+# Build a report for a public GitHub repo
+agentlens build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
+open ./agentlens-report-neon/report.html
 
-# Build the interactive HTML report
-agentlens build ./my-repo
+# Build a report for a local repo
+agentlens build ./my-repo --out ./agentlens-report
+open ./agentlens-report/report.html
 
-# Build and open in browser
-agentlens serve ./my-repo
+# Scan only and write manifest.json
+agentlens scan ./my-repo --out ./agentlens-scan
 
-# Scan a public GitHub repo
-agentlens build https://github.com/user/repo
+# Build and serve the report through a local web server
+agentlens serve https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon --port 4321
 ```
 
-Remote GitHub URL scanning supports public repos only.
-Private repos can be scanned by cloning them locally first and running AgentLens against the local path.
+**`build`** generates `report.html` and `manifest.json` in the output folder.  
+**`serve`** builds the report and opens it through a local web server.  
+**`--port`** belongs to `serve`, not `build`.
+
+Remote GitHub URL scanning supports public repos only. Private repos can be scanned by cloning locally first.
 
 ### Options
 
 | Flag | Description |
 |------|-------------|
-| `-o, --out <path>` | Custom output directory |
-| `-p, --port <number>` | Port for serve command (default: 4321) |
+| `-o, --out <path>` | Output directory |
+| `-p, --port <number>` | Port for `serve` command (default: 4321) |
 | `-v, --verbose` | Verbose output |
+
+### Troubleshooting
+
+If `agentlens` is not found after `npm install -g`, either run `npm link` from the AgentLens repo root (development installs), or invoke the CLI directly:
+
+```bash
+node dist/cli.js build https://github.com/neondatabase/ai-rules --out ./agentlens-report-neon
+open ./agentlens-report-neon/report.html
+```
 
 ---
 
 ## Output
 
-AgentLens generates:
+AgentLens writes:
 
 ```
-.agentlens/
+<output-folder>/
   manifest.json
   report.html
 ```
 
-- `manifest.json` is machine-readable scan results.
-- `report.html` is a self-contained interactive report.
+- `report.html` is the interactive, self-contained HTML report.
+- `manifest.json` is the machine-readable scan output.
 - `report.html` can be opened locally, shared as a file, or uploaded as a CI artifact.
 
 ---
