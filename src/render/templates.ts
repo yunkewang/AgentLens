@@ -1,4 +1,4 @@
-import type { AgentFile, Manifest, Risk, Warning } from '../core/types';
+import type { AgentFile, Manifest, Risk, SecurityFinding, SecuritySummary, Warning } from '../core/types';
 
 function escapeHtml(str: string): string {
   return str
@@ -13,6 +13,8 @@ function severityColor(severity: string): string {
   switch (severity) {
     case 'high': return '#c0392b';
     case 'medium': return '#e67e22';
+    case 'low': return '#2980b9';
+    case 'info': return '#7f8c8d';
     default: return '#7f8c8d';
   }
 }
@@ -21,6 +23,8 @@ function severityBg(severity: string): string {
   switch (severity) {
     case 'high': return '#fdf0ee';
     case 'medium': return '#fef9f0';
+    case 'low': return '#eaf4fb';
+    case 'info': return '#f4f6f7';
     default: return '#f4f6f7';
   }
 }
@@ -170,8 +174,98 @@ function renderSummaryCards(manifest: Manifest): string {
     </div>`).join('');
 }
 
+function renderSecurityBadge(severity: string): string {
+  return `<span class="badge" style="background:${severityColor(severity)}">${escapeHtml(severity.toUpperCase())}</span>`;
+}
+
+function renderSecurityFinding(f: SecurityFinding): string {
+  return `
+  <div class="sec-finding" style="border-left:4px solid ${severityColor(f.severity)};background:${severityBg(f.severity)};border-radius:6px;padding:14px 18px;margin:10px 0;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      ${renderSecurityBadge(f.severity)}
+      <span style="font-size:11px;color:#555;text-transform:uppercase;letter-spacing:0.5px;">${escapeHtml(f.category)}</span>
+    </div>
+    <div style="font-weight:600;font-size:15px;margin-bottom:4px;">${escapeHtml(f.title)}</div>
+    <div style="font-size:12px;color:#666;margin-bottom:6px;"><code>${escapeHtml(f.path)}</code></div>
+    <div style="font-size:14px;color:#333;margin-bottom:${f.evidence || f.recommendation ? '8px' : '0'};">${escapeHtml(f.message)}</div>
+    ${f.evidence ? `<div style="margin:6px 0;"><span style="font-size:12px;font-weight:600;color:#444;">Evidence:</span> <code style="font-size:12px;">${escapeHtml(f.evidence)}</code></div>` : ''}
+    ${f.recommendation ? `<div style="font-size:13px;color:#555;margin-top:6px;padding-top:6px;border-top:1px solid rgba(0,0,0,0.08);"><strong>Recommendation:</strong> ${escapeHtml(f.recommendation)}</div>` : ''}
+  </div>`;
+}
+
+function renderSecurityGroup(label: string, severity: string, findings: SecurityFinding[]): string {
+  if (!findings.length) return '';
+  return `
+  <div style="margin-bottom:24px;">
+    <h3 style="font-size:15px;font-weight:700;color:${severityColor(severity)};margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+      <span class="badge" style="background:${severityColor(severity)}">${escapeHtml(label)}</span>
+      <span style="color:#444;font-weight:400;">${findings.length} finding${findings.length !== 1 ? 's' : ''}</span>
+    </h3>
+    ${findings.map(renderSecurityFinding).join('')}
+  </div>`;
+}
+
+function renderSecuritySummaryCards(sec: SecuritySummary): string {
+  const total = sec.findingsCount.high + sec.findingsCount.medium + sec.findingsCount.low + sec.findingsCount.info;
+  const cards = [
+    { label: 'High', value: sec.findingsCount.high, color: '#c0392b' },
+    { label: 'Medium', value: sec.findingsCount.medium, color: '#e67e22' },
+    { label: 'Low', value: sec.findingsCount.low, color: '#2980b9' },
+    { label: 'Info', value: sec.findingsCount.info, color: '#7f8c8d' },
+    { label: 'Total', value: total, color: '#2c3e50' },
+  ];
+  return cards.map((c) => `
+    <div class="summary-card">
+      <div class="summary-num" style="color:${c.color}">${c.value}</div>
+      <div class="summary-label">${escapeHtml(c.label)}</div>
+    </div>`).join('');
+}
+
+function renderPostureChip(posture: SecuritySummary['posture']): string {
+  const map: Record<string, { label: string; color: string }> = {
+    needs_review: { label: 'Needs Review', color: '#c0392b' },
+    caution:      { label: 'Caution',      color: '#e67e22' },
+    clean:        { label: 'Clean',        color: '#27ae60' },
+  };
+  const { label, color } = map[posture] ?? map.clean;
+  return `<span class="badge" style="background:${color};font-size:13px;padding:4px 12px;">${escapeHtml(label)}</span>`;
+}
+
+function renderSecuritySection(sec: SecuritySummary): string {
+  const high   = sec.findings.filter((f) => f.severity === 'high');
+  const medium = sec.findings.filter((f) => f.severity === 'medium');
+  const low    = sec.findings.filter((f) => f.severity === 'low');
+  const info   = sec.findings.filter((f) => f.severity === 'info');
+
+  const noFindings = sec.findings.length === 0;
+
+  return `
+  <section class="section" id="security">
+    <h2 class="section-title">🔒 Security Review</h2>
+
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <span style="font-size:14px;color:#555;">Security Posture:</span>
+      ${renderPostureChip(sec.posture)}
+    </div>
+
+    <div class="summary-cards" style="margin-bottom:20px;">
+      ${renderSecuritySummaryCards(sec)}
+    </div>
+
+    <p style="font-size:13px;color:#666;margin-bottom:20px;background:#f7f8fa;border:1px solid #e1e4e8;border-radius:6px;padding:10px 14px;">
+      AgentLens scans the agent instruction layer, not application source code. Findings highlight risks in
+      instructions, rules, skills, command files, prompt files, and MCP configs that AI coding agents may follow.
+    </p>
+
+    ${noFindings
+      ? '<p class="dim-text">No agent instruction security findings detected by the current rule set.</p>'
+      : `${renderSecurityGroup('High', 'high', high)}${renderSecurityGroup('Medium', 'medium', medium)}${renderSecurityGroup('Low', 'low', low)}${renderSecurityGroup('Info', 'info', info)}`
+    }
+  </section>`;
+}
+
 export function renderReport(manifest: Manifest): string {
-  const { repo, summary, files, warnings } = manifest;
+  const { repo, summary, security, files, warnings } = manifest;
   const scoreCol = scoreColor(summary.score);
 
   const genericInstructions = files.filter((f) => f.type === 'generic_instruction');
@@ -267,6 +361,7 @@ export function renderReport(manifest: Manifest): string {
   <div class="container">
     <span class="nav-logo">AgentLens</span>
     <a href="#score">Score</a>
+    <a href="#security">Security</a>
     <a href="#warnings">Warnings</a>
     ${genericInstructions.length ? '<a href="#instructions">Instructions</a>' : ''}
     ${rules.length ? '<a href="#rules">Rules</a>' : ''}
@@ -312,6 +407,8 @@ export function renderReport(manifest: Manifest): string {
         ${summary.scoreExplanation.map((e) => `<li>${escapeHtml(e)}</li>`).join('')}
       </ul>` : '<p class="dim-text" style="margin-top:10px;">No scoring factors found.</p>'}
     </section>
+
+    ${renderSecuritySection(security)}
 
     <section class="section" id="warnings">
       <h2 class="section-title">⚠️ Warnings</h2>

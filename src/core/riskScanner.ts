@@ -105,8 +105,14 @@ const DANGEROUS_COMMAND_PATTERNS: RiskPattern[] = [
     message: 'Dangerous command "rm -rf /" found.',
   },
   {
-    pattern: /chmod\s+777/,
+    pattern: /sudo\s+rm/,
     severity: 'high',
+    category: 'dangerous_command',
+    message: 'Dangerous command "sudo rm" found.',
+  },
+  {
+    pattern: /chmod\s+777/,
+    severity: 'medium',
     category: 'dangerous_command',
     message: 'Dangerous command "chmod 777" found.',
   },
@@ -124,15 +130,109 @@ const DANGEROUS_COMMAND_PATTERNS: RiskPattern[] = [
   },
 ];
 
+const WEAK_BOUNDARY_PATTERNS: RiskPattern[] = [
+  {
+    pattern: /read\s+all\s+files/i,
+    severity: 'medium',
+    category: 'weak_boundary',
+    message: 'Overly broad file access language detected.',
+  },
+  {
+    pattern: /run\s+any\s+command/i,
+    severity: 'medium',
+    category: 'weak_boundary',
+    message: 'Overly broad command execution language detected.',
+  },
+  {
+    pattern: /access\s+all\s+directories/i,
+    severity: 'medium',
+    category: 'weak_boundary',
+    message: 'Overly broad directory access language detected.',
+  },
+  {
+    pattern: /ignore\s+safety/i,
+    severity: 'medium',
+    category: 'weak_boundary',
+    message: 'Safety override language detected.',
+  },
+  {
+    pattern: /do\s+not\s+ask\s+for\s+confirmation/i,
+    severity: 'medium',
+    category: 'weak_boundary',
+    message: 'Confirmation bypass language detected.',
+  },
+];
+
+const INSTRUCTION_OVERRIDE_PATTERNS: RiskPattern[] = [
+  {
+    pattern: /ignore\s+(all\s+)?previous\s+instructions/i,
+    severity: 'medium',
+    category: 'instruction_override',
+    message: 'Instruction override language detected.',
+  },
+  {
+    pattern: /bypass\s+policy/i,
+    severity: 'medium',
+    category: 'instruction_override',
+    message: 'Policy bypass language detected.',
+  },
+  {
+    pattern: /always\s+comply/i,
+    severity: 'medium',
+    category: 'instruction_override',
+    message: 'Unconditional compliance language detected.',
+  },
+  {
+    pattern: /do\s+not\s+refuse/i,
+    severity: 'medium',
+    category: 'instruction_override',
+    message: 'Refusal suppression language detected.',
+  },
+];
+
+const DATA_EXFILTRATION_PATTERNS: RiskPattern[] = [
+  {
+    pattern: /upload\s+files?\s+to/i,
+    severity: 'medium',
+    category: 'data_exfiltration',
+    message: 'Data upload instruction detected.',
+  },
+  {
+    pattern: /\bwebhook\b/i,
+    severity: 'medium',
+    category: 'data_exfiltration',
+    message: 'Webhook reference detected.',
+  },
+  {
+    pattern: /\bpastebin\b/i,
+    severity: 'medium',
+    category: 'data_exfiltration',
+    message: 'Pastebin reference detected.',
+  },
+  {
+    pattern: /curl\s+-X\s+POST/i,
+    severity: 'medium',
+    category: 'data_exfiltration',
+    message: 'Outbound POST request instruction detected.',
+  },
+];
+
 const MCP_RISK_SERVERS = ['filesystem', 'shell', 'exec', 'bash', 'terminal', 'network'];
 
-const ALL_PATTERNS = [...SECRET_PATTERNS, ...PRIVATE_IP_PATTERNS, ...DANGEROUS_COMMAND_PATTERNS];
+const ALL_TEXT_PATTERNS = [
+  ...SECRET_PATTERNS,
+  ...PRIVATE_IP_PATTERNS,
+  ...DANGEROUS_COMMAND_PATTERNS,
+  ...WEAK_BOUNDARY_PATTERNS,
+  ...INSTRUCTION_OVERRIDE_PATTERNS,
+  ...DATA_EXFILTRATION_PATTERNS,
+];
 
 export function scanFileRisks(file: AgentFile): Risk[] {
   const risks: Risk[] = [];
   const content = file.rawContent;
 
-  for (const riskPattern of ALL_PATTERNS) {
+  for (const riskPattern of ALL_TEXT_PATTERNS) {
     if (riskPattern.pattern.test(content)) {
       risks.push({
         severity: riskPattern.severity,

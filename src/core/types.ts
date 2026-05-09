@@ -21,11 +21,34 @@ export type FileSubtype =
 
 export type RiskSeverity = 'high' | 'medium' | 'low';
 
+export type SecuritySeverity = 'high' | 'medium' | 'low' | 'info';
+
 export interface Risk {
   severity: RiskSeverity;
   category: string;
   message: string;
   path?: string;
+}
+
+export interface SecurityFinding {
+  severity: SecuritySeverity;
+  category: string;
+  title: string;
+  message: string;
+  path: string;
+  evidence?: string;
+  recommendation?: string;
+}
+
+export interface SecuritySummary {
+  posture: 'needs_review' | 'caution' | 'clean';
+  findingsCount: {
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  findings: SecurityFinding[];
 }
 
 export interface AgentFile {
@@ -73,6 +96,7 @@ export interface RepoInfo {
 export interface Manifest {
   repo: RepoInfo;
   summary: RepoSummary;
+  security: SecuritySummary;
   files: AgentFile[];
   warnings: Warning[];
 }

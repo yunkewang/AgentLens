@@ -1,6 +1,6 @@
-import path from 'path';
 import type { AgentFile, Manifest, RepoInfo, RepoSummary, Warning } from './types';
 import { calculateScore, generateWarnings } from './scoring';
+import { runSecurityScan } from './securityScanner';
 
 export function buildManifest(
   files: AgentFile[],
@@ -10,6 +10,7 @@ export function buildManifest(
 ): Manifest {
   const scoreResult = calculateScore(files);
   const warnings = [...generateWarnings(files, scoreResult), ...extraWarnings];
+  const security = runSecurityScan(files);
 
   const counts = {
     genericInstructions: files.filter((f) => f.type === 'generic_instruction').length,
@@ -31,5 +32,5 @@ export function buildManifest(
     counts,
   };
 
-  return { repo, summary, files, warnings };
+  return { repo, summary, security, files, warnings };
 }
