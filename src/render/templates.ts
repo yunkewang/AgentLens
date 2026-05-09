@@ -20,23 +20,56 @@ function fileUid(path: string): string {
 }
 
 function sevColor(s: string): string {
-  return s === 'high' ? '#c0392b' : s === 'medium' ? '#e67e22' : s === 'low' ? '#2980b9' : '#7f8c8d';
+  return s === 'high' ? '#DC2626' : s === 'medium' ? '#D97706' : s === 'low' ? '#2563EB' : '#64748B';
 }
 
 function sevBg(s: string): string {
-  return s === 'high' ? '#fdf0ee' : s === 'medium' ? '#fef9f0' : s === 'low' ? '#eaf4fb' : '#f4f6f7';
+  return s === 'high' ? '#FEF2F2' : s === 'medium' ? '#FFFBEB' : s === 'low' ? '#EFF6FF' : '#F8FAFC';
 }
 
-function scoreCol(n: number): string {
-  return n >= 75 ? '#27ae60' : n >= 50 ? '#f39c12' : '#c0392b';
+function totalFindings(security: Manifest['security']): number {
+  return security.findingsCount.high + security.findingsCount.medium + security.findingsCount.low + security.findingsCount.info;
+}
+
+function readinessLabel(score: number): string {
+  return score >= 75 ? 'Complete' : score >= 50 ? 'Partial' : 'Incomplete';
+}
+
+function readinessColor(score: number, findingCount = 0): string {
+  if (score < 50) return '#DC2626';
+  if (score < 75) return '#D97706';
+  return findingCount > 0 ? '#2563EB' : '#16A34A';
+}
+
+function postureColor(posture: string): string {
+  const m: Record<string, string> = {
+    needs_review: '#DC2626',
+    caution: '#D97706',
+    clean: '#16A34A',
+  };
+  return m[posture] ?? '#16A34A';
+}
+
+function postureLabel(posture: string): string {
+  const m: Record<string, string> = {
+    needs_review: 'Needs Review',
+    caution: 'Caution',
+    clean: 'Clean',
+  };
+  return m[posture] ?? 'Clean';
+}
+
+function shortText(text: string | undefined, max = 120): string {
+  if (!text) return '';
+  return text.length > max ? `${text.slice(0, max).trim()}...` : text;
 }
 
 function typeColor(t: string): string {
   const m: Record<string, string> = {
-    generic_instruction: '#2980b9', rule: '#8e44ad', skill: '#16a085',
-    mcp_config: '#d35400', prompt: '#2c3e50', project_doc: '#34495e',
+    generic_instruction: '#2563EB', rule: '#7C3AED', skill: '#0D9488',
+    mcp_config: '#EA580C', prompt: '#334155', project_doc: '#475569',
   };
-  return m[t] ?? '#555';
+  return m[t] ?? '#64748B';
 }
 
 function typeLabel(t: string): string {
@@ -60,13 +93,7 @@ function sevBadge(sev: string): string {
 }
 
 function postureChip(posture: string): string {
-  const m: Record<string, [string, string]> = {
-    needs_review: ['Needs Review', '#c0392b'],
-    caution: ['Caution', '#e67e22'],
-    clean: ['Clean', '#27ae60'],
-  };
-  const [label, color] = m[posture] ?? ['Clean', '#27ae60'];
-  return `<span class="posture-chip" style="background:${color}">${esc(label)}</span>`;
+  return `<span class="posture-chip" style="background:${postureColor(posture)}">${esc(postureLabel(posture))}</span>`;
 }
 
 // ── Fix prompt templates ──────────────────────────────────────────────────────
@@ -96,30 +123,37 @@ const CSS = `
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f7f8fa; color: #2c3e50; line-height: 1.6; font-size: 14px;
+  background: #F8FAFC; color: #1E293B; line-height: 1.6; font-size: 14px;
 }
-a { color: #2980b9; text-decoration: none; }
+a { color: #2563EB; text-decoration: none; }
 a:hover { text-decoration: underline; }
-code { font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; font-size: 0.875em; background: #eef1f4; padding: 1px 5px; border-radius: 3px; }
+code { font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; font-size: 0.875em; background: #F1F5F9; padding: 1px 5px; border-radius: 3px; }
 pre { font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; }
 
 /* Header */
-.header { background: #1a1a2e; color: #fff; padding: 20px 0; }
-.header-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.header { background: #0F172A; color: #fff; padding: 26px 0; border-bottom: 1px solid rgba(148,163,184,0.18); }
+.header-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
 .logo { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: #fff; }
-.tagline { font-size: 13px; color: #adb5bd; margin-top: 2px; }
-.repo-meta { font-size: 12px; color: #adb5bd; margin-top: 6px; }
-.repo-meta code { background: rgba(255,255,255,0.1); color: #ddd; }
-.header-score { text-align: right; flex-shrink: 0; }
-.score-num-large { font-size: 40px; font-weight: 800; line-height: 1; }
-.score-suffix { font-size: 18px; font-weight: 400; color: #adb5bd; }
+.tagline { font-size: 13px; color: #94A3B8; margin-top: 2px; }
+.repo-meta { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+.repo-meta code { background: rgba(255,255,255,0.1); color: #CBD5E1; }
+.header-right { flex-shrink: 0; display: grid; grid-template-columns: repeat(2, minmax(148px, 1fr)); gap: 10px; align-items: stretch; max-width: 380px; }
+.header-metric { background: rgba(15,23,42,0.72); border: 1px solid rgba(148,163,184,0.24); border-radius: 8px; padding: 12px 14px; text-align: left; }
+.header-score { text-align: left; }
+.header-score-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8; margin-bottom: 4px; }
+.score-num-large { font-size: 31px; font-weight: 800; line-height: 1; }
+.score-suffix { font-size: 16px; font-weight: 400; color: #94A3B8; }
+.header-posture { text-align: left; }
+.header-posture-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: #94A3B8; margin-bottom: 4px; }
+.header-finding-count { font-size: 12px; color: #94A3B8; margin-top: 6px; }
+.header-metric-note { font-size: 11px; color: #94A3B8; margin-top: 6px; line-height: 1.4; }
 
 /* Tab nav */
-.tab-nav { background: #252540; border-bottom: 1px solid #1a1a2e; position: sticky; top: 0; z-index: 100; overflow-x: auto; }
+.tab-nav { background: #1E293B; border-bottom: 1px solid #0F172A; position: sticky; top: 0; z-index: 100; overflow-x: auto; }
 .tab-nav-inner { max-width: 1100px; margin: 0 auto; padding: 0 24px; display: flex; }
-.tab-btn { background: none; border: none; color: #adb5bd; font-size: 13px; font-weight: 500; padding: 12px 16px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
-.tab-btn:hover { color: #fff; }
-.tab-btn.active { color: #fff; border-bottom-color: #4fa3e0; }
+.tab-btn { background: none; border: none; color: #94A3B8; font-size: 13px; font-weight: 500; padding: 12px 16px; cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
+.tab-btn:hover { color: #F1F5F9; }
+.tab-btn.active { color: #fff; border-bottom-color: #3B82F6; }
 
 /* Layout */
 .main { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
@@ -127,78 +161,79 @@ pre { font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; }
 .tab-panel.active { display: block; }
 
 /* Section title */
-.section-title { font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #e1e4e8; }
-.section-desc { font-size: 13px; color: #666; background: #f7f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; line-height: 1.6; }
+.section-title { font-size: 18px; font-weight: 700; color: #0F172A; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid #E2E8F0; }
+.section-desc { font-size: 13px; color: #64748B; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; line-height: 1.6; }
 
 /* Cards */
-.card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 18px; margin-bottom: 14px; }
-.card-title { font-size: 16px; font-weight: 600; color: #1a1a2e; }
-.card-path { font-size: 12px; color: #666; margin-top: 2px; font-family: 'SFMono-Regular', Consolas, monospace; }
-.card-desc { font-size: 13px; color: #555; margin: 8px 0; }
+.card { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.card-title { font-size: 16px; font-weight: 600; color: #0F172A; }
+.card-path { font-size: 12px; color: #64748B; margin-top: 2px; font-family: 'SFMono-Regular', Consolas, monospace; }
+.card-desc { font-size: 13px; color: #475569; margin: 8px 0; }
 
 /* Summary grid */
 .summary-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
-.summary-card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 14px 18px; min-width: 85px; text-align: center; flex: 1; }
+.summary-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 18px; min-width: 85px; text-align: center; flex: 1; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.summary-card.emphasis { border-color: #CBD5E1; box-shadow: 0 8px 24px rgba(15,23,42,0.08); }
 .summary-num { font-size: 28px; font-weight: 700; line-height: 1.1; }
-.summary-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
+.summary-label { font-size: 11px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 3px; }
 
 /* Badges */
 .badge { display: inline-block; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle; }
-.posture-chip { display: inline-block; color: #fff; font-size: 12px; font-weight: 600; padding: 3px 12px; border-radius: 12px; }
+.posture-chip { display: inline-block; color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 12px; }
 
 /* Findings */
 .finding-card { border-left: 4px solid; border-radius: 6px; padding: 14px 16px; margin: 8px 0; }
-.finding-title { font-weight: 600; font-size: 15px; margin: 6px 0 4px; }
-.finding-path { font-size: 12px; color: #666; font-family: 'SFMono-Regular', Consolas, monospace; margin-bottom: 6px; }
-.finding-message { font-size: 13px; color: #333; }
+.finding-title { font-weight: 600; font-size: 15px; margin: 6px 0 4px; color: #0F172A; }
+.finding-path { font-size: 12px; color: #64748B; font-family: 'SFMono-Regular', Consolas, monospace; margin-bottom: 6px; }
+.finding-message { font-size: 13px; color: #334155; }
 .finding-evidence { margin-top: 8px; font-size: 12px; }
-.finding-rec { margin-top: 8px; font-size: 13px; color: #555; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.08); }
+.finding-rec { margin-top: 8px; font-size: 13px; color: #64748B; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.06); }
 .finding-group { margin-bottom: 24px; }
 .finding-group-header { font-size: 14px; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 
 /* Filter bar */
-.filter-bar { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.filter-bar select, .filter-bar input { border: 1px solid #d1d5da; border-radius: 5px; padding: 6px 10px; font-size: 13px; background: #fff; color: #333; font-family: inherit; }
+.filter-bar { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.filter-bar select, .filter-bar input { border: 1px solid #CBD5E1; border-radius: 5px; padding: 6px 10px; font-size: 13px; background: #fff; color: #334155; font-family: inherit; }
 .filter-bar input { flex: 1; min-width: 160px; }
-.filter-label { font-size: 12px; color: #666; font-weight: 600; white-space: nowrap; }
-.filter-count { font-size: 12px; color: #888; white-space: nowrap; }
+.filter-label { font-size: 12px; color: #64748B; font-weight: 600; white-space: nowrap; }
+.filter-count { font-size: 12px; color: #94A3B8; white-space: nowrap; }
 
 /* Buttons */
-.copy-btn { background: #f1f3f5; border: 1px solid #d1d5da; border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #333; transition: background 0.15s; font-family: inherit; }
-.copy-btn:hover { background: #e2e6ea; }
-.copy-btn.copied { background: #d4edda; border-color: #c3e6cb; color: #155724; }
-.action-btn { background: #2980b9; color: #fff; border: none; border-radius: 5px; padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: inherit; }
-.action-btn:hover { background: #236fa1; }
+.copy-btn { background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 5px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #334155; transition: background 0.15s; font-family: inherit; }
+.copy-btn:hover { background: #E2E8F0; }
+.copy-btn.copied { background: #DCFCE7; border-color: #BBF7D0; color: #166534; }
+.action-btn { background: #2563EB; color: #fff; border: none; border-radius: 5px; padding: 6px 14px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.action-btn:hover { background: #1D4ED8; }
 
 /* Meta block */
-.meta-block { background: #f7f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 13px; }
+.meta-block { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin: 10px 0; font-size: 13px; }
 .meta-row { margin: 3px 0; }
-.meta-label { font-weight: 600; color: #444; display: inline-block; min-width: 110px; }
+.meta-label { font-weight: 600; color: #475569; display: inline-block; min-width: 110px; }
 
 /* Code blocks */
-.code-block { background: #f4f5f7; border: 1px solid #e1e4e8; border-radius: 6px; padding: 14px; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 420px; overflow-y: auto; margin: 10px 0; }
+.code-block { background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px; padding: 14px; font-size: 12.5px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 420px; overflow-y: auto; margin: 10px 0; }
 
 /* Rendered markdown */
 .rendered-md { font-size: 14px; line-height: 1.7; }
-.rendered-md h1, .rendered-md h2, .rendered-md h3 { margin: 12px 0 6px; font-weight: 600; color: #1a1a2e; }
+.rendered-md h1, .rendered-md h2, .rendered-md h3 { margin: 12px 0 6px; font-weight: 600; color: #0F172A; }
 .rendered-md h1 { font-size: 18px; } .rendered-md h2 { font-size: 16px; } .rendered-md h3 { font-size: 14px; }
 .rendered-md p { margin: 6px 0; }
 .rendered-md ul, .rendered-md ol { margin: 6px 0 6px 20px; }
 .rendered-md li { margin: 2px 0; }
-.rendered-md code { background: #eef1f4; }
-.rendered-md pre { background: #f4f5f7; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
-.rendered-md blockquote { border-left: 3px solid #d1d5da; padding-left: 12px; color: #666; margin: 8px 0; }
+.rendered-md code { background: #F1F5F9; }
+.rendered-md pre { background: #F1F5F9; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+.rendered-md blockquote { border-left: 3px solid #CBD5E1; padding-left: 12px; color: #64748B; margin: 8px 0; }
 .rendered-md table { border-collapse: collapse; margin: 8px 0; font-size: 13px; }
-.rendered-md th, .rendered-md td { border: 1px solid #e1e4e8; padding: 6px 10px; }
-.rendered-md th { background: #f7f8fa; }
+.rendered-md th, .rendered-md td { border: 1px solid #E2E8F0; padding: 6px 10px; }
+.rendered-md th { background: #F8FAFC; }
 
 /* Collapsible */
-.collapsible summary { cursor: pointer; font-size: 13px; color: #666; padding: 6px 0; user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
+.collapsible summary { cursor: pointer; font-size: 13px; color: #64748B; padding: 6px 0; user-select: none; list-style: none; display: flex; align-items: center; gap: 6px; }
 .collapsible summary::-webkit-details-marker { display: none; }
-.collapsible summary .toggle-icon { font-size: 10px; color: #999; transition: transform 0.15s; display: inline-block; width: 10px; }
+.collapsible summary .toggle-icon { font-size: 10px; color: #94A3B8; transition: transform 0.15s; display: inline-block; width: 10px; }
 details[open] summary .toggle-icon { transform: rotate(90deg); }
-.collapsible summary:hover { color: #2980b9; }
-.collapsible summary:hover .toggle-icon { color: #2980b9; }
+.collapsible summary:hover { color: #2563EB; }
+.collapsible summary:hover .toggle-icon { color: #2563EB; }
 
 /* Risk items */
 .risk-item { padding: 6px 10px; margin: 4px 0; border-radius: 4px; font-size: 13px; border-left: 3px solid; display: flex; align-items: flex-start; gap: 6px; }
@@ -208,30 +243,30 @@ details[open] summary .toggle-icon { transform: rotate(90deg); }
 
 /* Instruction map */
 .map-group { margin-bottom: 28px; }
-.map-group-title { font-size: 12px; font-weight: 700; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
+.map-group-title { font-size: 12px; font-weight: 700; color: #94A3B8; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px; }
 .map-items { display: flex; flex-wrap: wrap; gap: 8px; }
-.map-item { background: #fff; border: 1px solid #e1e4e8; border-radius: 6px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: border-color 0.15s, box-shadow 0.15s; max-width: 400px; }
-.map-item:hover { border-color: #2980b9; box-shadow: 0 2px 6px rgba(41,128,185,0.12); }
-.map-item.has-findings { border-left: 3px solid #e67e22; }
-.map-item-path { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; color: #333; word-break: break-all; }
-.map-item-warn { color: #e67e22; font-size: 13px; margin-left: auto; flex-shrink: 0; }
+.map-item { background: #fff; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px; transition: border-color 0.15s, box-shadow 0.15s; max-width: 400px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.map-item:hover { border-color: #3B82F6; box-shadow: 0 2px 8px rgba(59,130,246,0.12); }
+.map-item.has-findings { border-left: 3px solid #D97706; }
+.map-item-path { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; color: #334155; word-break: break-all; }
+.map-item-warn { color: #D97706; font-size: 13px; margin-left: auto; flex-shrink: 0; }
 
 /* File card header */
 .file-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .file-card-title-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
 
 /* Fix prompts */
-.fix-prompt-card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 18px; margin-bottom: 14px; }
-.fix-prompt-text { background: #f7f8fa; border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px; font-size: 13px; line-height: 1.7; color: #333; margin: 10px 0; white-space: pre-wrap; font-family: inherit; }
+.fix-prompt-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px; margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.fix-prompt-text { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; font-size: 13px; line-height: 1.7; color: #334155; margin: 10px 0; white-space: pre-wrap; font-family: inherit; }
 
 /* Overview layout */
 .overview-top { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
 .score-explanation { list-style: none; margin: 10px 0 0; }
-.score-explanation li { font-size: 13px; padding: 2px 0; color: #27ae60; }
-.score-explanation li::before { content: '✓  '; }
+.score-explanation li { font-size: 13px; padding: 2px 0; color: #475569; }
+.score-explanation li::before { content: '\\2713  '; }
 
 /* Empty state */
-.empty-msg { color: #888; font-size: 14px; padding: 24px 0; }
+.empty-msg { color: #94A3B8; font-size: 14px; padding: 24px 0; }
 
 /* Relative container for copy-on-code */
 .code-wrap { position: relative; }
@@ -240,12 +275,33 @@ details[open] summary .toggle-icon { transform: rotate(90deg); }
 /* Inline row utilities */
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
+/* Assessment cards */
+.overview-group-label { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.6px; margin: 6px 0 10px; }
+.assess-grid { display: grid; grid-template-columns: 1.12fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.assess-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.assess-card.primary-risk { border-color: #CBD5E1; box-shadow: 0 10px 28px rgba(15,23,42,0.08); }
+.assess-card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #64748B; font-weight: 600; margin-bottom: 10px; }
+.assess-card-divider { height: 1px; background: #E2E8F0; margin: 12px 0; }
+.assessment-note { font-size: 12px; color: #64748B; line-height: 1.5; margin-top: 8px; }
+.severity-breakdown { display: grid; grid-template-columns: repeat(4, minmax(54px, 1fr)); gap: 8px; margin-top: 12px; }
+.severity-pill { border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px; background: #F8FAFC; }
+.severity-pill-num { font-size: 20px; font-weight: 800; line-height: 1; }
+.severity-pill-label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+.inventory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.inventory-card { background: #fff; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 12px; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.inventory-num { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.inventory-label { font-size: 10px; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
 @media (max-width: 700px) {
   .overview-top { grid-template-columns: 1fr; }
+  .assess-grid { grid-template-columns: 1fr; }
   .header-inner { flex-direction: column; }
+  .header-right { grid-template-columns: 1fr; width: 100%; max-width: none; }
   .header-score { text-align: left; }
   .summary-card { min-width: 70px; }
   .map-item { max-width: 100%; }
+  .inventory-grid { grid-template-columns: repeat(3, 1fr); }
+  .severity-breakdown { grid-template-columns: repeat(2, 1fr); }
 }
 `;
 
@@ -355,7 +411,7 @@ const JS = `
       var el = document.getElementById(uid);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.outline = '2px solid #2980b9';
+        el.style.outline = '2px solid #2563EB';
         setTimeout(function () { el.style.outline = ''; }, 1600);
       }
     }, 80);
@@ -395,7 +451,7 @@ function renderMeta(file: AgentFile): string {
 
   if (file.type === 'mcp_config') {
     if (Array.isArray(m.servers) && m.servers.length) {
-      const serverBadges = (m.servers as string[]).map((s) => badge(s, '#555')).join(' ');
+      const serverBadges = (m.servers as string[]).map((s) => badge(s, '#64748B')).join(' ');
       parts.push(`<div class="meta-row"><span class="meta-label">Servers</span> ${serverBadges}</div>`);
     }
   }
@@ -441,53 +497,75 @@ function rawBlock(id: string, content: string): string {
 
 function renderOverview(manifest: Manifest): string {
   const { repo: _repo, summary, security, files, warnings, projectDocs, projectDocsInfo } = manifest;
-  const sc = scoreCol(summary.score);
+  const total = totalFindings(security);
+  const sc = readinessColor(summary.score, total);
   const totalFiles = files.length;
-  const totalFindings = security.findingsCount.high + security.findingsCount.medium + security.findingsCount.low + security.findingsCount.info;
   const topFindings = security.findings.filter((f) => f.severity === 'high' || f.severity === 'medium').slice(0, 3);
   const docsEnabled = !!projectDocsInfo?.enabled;
   const docsCount = projectDocs?.length ?? 0;
+  const readiness = readinessLabel(summary.score);
+  const posture = postureLabel(security.posture);
+  const postureTone = postureColor(security.posture);
 
   return `<h2 class="section-title">Overview</h2>
 
-<div class="overview-top">
-  <div class="card">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:8px;">Agent Readiness Score</div>
+<div class="overview-group-label">Assessment</div>
+<div class="assess-grid">
+  <div class="assess-card primary-risk" style="border-top:4px solid ${total > 0 ? postureTone : '#16A34A'};">
+    <div class="assess-card-label">Findings</div>
     <div style="display:flex;align-items:baseline;gap:8px;">
-      <span style="font-size:44px;font-weight:800;color:${sc};line-height:1;">${summary.score}</span>
-      <span style="font-size:16px;color:#aaa;">/ 100</span>
+      <span style="font-size:44px;font-weight:800;color:${total > 0 ? postureTone : '#16A34A'};line-height:1;">${total}</span>
+      <span style="font-size:13px;color:#64748B;">security signal${total !== 1 ? 's' : ''}</span>
     </div>
-    ${summary.scoreExplanation.length ? `<ul class="score-explanation">${summary.scoreExplanation.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
+    <div class="severity-breakdown">
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('high')}">${security.findingsCount.high}</div><div class="severity-pill-label">High</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('medium')}">${security.findingsCount.medium}</div><div class="severity-pill-label">Medium</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('low')}">${security.findingsCount.low}</div><div class="severity-pill-label">Low</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('info')}">${security.findingsCount.info}</div><div class="severity-pill-label">Info</div></div>
+    </div>
+    ${total > 0 ? `<div style="margin-top:14px;"><button class="action-btn" onclick="showTab('security')">Review Findings &#8594;</button></div>` : '<div class="assessment-note">No agent instruction security findings were detected by the current rule set.</div>'}
   </div>
-  <div class="card">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:8px;">Security Posture</div>
-    <div style="margin-bottom:10px;">${postureChip(security.posture)}</div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;">
-      <span style="font-size:13px;"><strong style="color:${sevColor('high')}">${security.findingsCount.high}</strong> <span style="color:#666;">High</span></span>
-      <span style="font-size:13px;"><strong style="color:${sevColor('medium')}">${security.findingsCount.medium}</strong> <span style="color:#666;">Medium</span></span>
-      <span style="font-size:13px;"><strong style="color:${sevColor('low')}">${security.findingsCount.low}</strong> <span style="color:#666;">Low</span></span>
-      <span style="font-size:13px;"><strong style="color:${sevColor('info')}">${security.findingsCount.info}</strong> <span style="color:#666;">Info</span></span>
+  <div class="assess-card" style="border-top:4px solid ${postureTone};">
+    <div class="assess-card-label">Risk Posture</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      ${postureChip(security.posture)}
+      <span style="font-size:16px;font-weight:700;color:#0F172A;">${esc(posture)}</span>
     </div>
+    <div class="assessment-note">
+      Based on security findings in agent instructions, prompts, skills, and MCP configuration.
+      ${security.findingsCount.medium > 0 ? 'Medium findings keep the posture at Caution even when readiness is complete.' : ''}
+    </div>
+  </div>
+  <div class="assess-card">
+    <div class="assess-card-label">Agent Readiness</div>
+    <div style="display:flex;align-items:baseline;gap:8px;">
+      <span style="font-size:40px;font-weight:800;color:${sc};line-height:1;">${summary.score}</span>
+      <span style="font-size:15px;color:#94A3B8;">/ 100</span>
+      <span style="font-size:12px;color:${sc};font-weight:600;margin-left:4px;">${esc(readiness)}</span>
+    </div>
+    <div class="assess-card-divider"></div>
+    <div style="font-size:12px;color:#64748B;margin-bottom:6px;">Measures whether agent artifacts are present, not whether the repo is safe.</div>
+    ${summary.scoreExplanation.length ? `<ul class="score-explanation">${summary.scoreExplanation.map((e) => `<li>${esc(e)}</li>`).join('')}</ul>` : ''}
   </div>
 </div>
 
-<div class="summary-grid">
-  <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${totalFiles}</div><div class="summary-label">Total Files</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#2980b9">${summary.counts.genericInstructions}</div><div class="summary-label">Instructions</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#8e44ad">${summary.counts.rules}</div><div class="summary-label">Rules</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#16a085">${summary.counts.skills}</div><div class="summary-label">Skills</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#d35400">${summary.counts.mcpConfigs}</div><div class="summary-label">MCP Configs</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${summary.counts.prompts}</div><div class="summary-label">Prompts</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:${totalFindings > 0 ? sevColor('medium') : '#27ae60'}">${totalFindings}</div><div class="summary-label">Findings</div></div>
-  ${docsEnabled ? `<div class="summary-card"><div class="summary-num" style="color:#34495e">${docsCount}</div><div class="summary-label">Project Docs</div></div>` : ''}
+<div class="overview-group-label">Inventory</div>
+<div class="inventory-grid">
+  <div class="inventory-card"><div class="inventory-num" style="color:#1E293B">${totalFiles}</div><div class="inventory-label">Total Files</div></div>
+  <div class="inventory-card"><div class="inventory-num" style="color:#2563EB">${summary.counts.genericInstructions}</div><div class="inventory-label">Instructions</div></div>
+  <div class="inventory-card"><div class="inventory-num" style="color:#7C3AED">${summary.counts.rules}</div><div class="inventory-label">Rules</div></div>
+  <div class="inventory-card"><div class="inventory-num" style="color:#0D9488">${summary.counts.skills}</div><div class="inventory-label">Skills</div></div>
+  <div class="inventory-card"><div class="inventory-num" style="color:#EA580C">${summary.counts.mcpConfigs}</div><div class="inventory-label">MCP Configs</div></div>
+  <div class="inventory-card"><div class="inventory-num" style="color:#334155">${summary.counts.prompts}</div><div class="inventory-label">Prompts</div></div>
+  ${docsEnabled ? `<div class="inventory-card"><div class="inventory-num" style="color:#475569">${docsCount}</div><div class="inventory-label">Project Docs</div></div>` : ''}
 </div>
 
 ${docsEnabled ? `
-<div class="card" style="margin-bottom:16px;border-left:4px solid #34495e;">
+<div class="card" style="margin-bottom:16px;border-left:4px solid #475569;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <span style="font-size:13px;font-weight:600;">Project documentation scanning enabled</span>
-    ${badge('--include-docs', '#34495e')}
-    <span style="font-size:12px;color:#666;">${docsCount} doc${docsCount !== 1 ? 's' : ''} scanned${projectDocsInfo && projectDocsInfo.skipped > 0 ? ` · ${projectDocsInfo.skipped} skipped` : ''}</span>
+    ${badge('--include-docs', '#475569')}
+    <span style="font-size:12px;color:#64748B;">${docsCount} doc${docsCount !== 1 ? 's' : ''} scanned${projectDocsInfo && projectDocsInfo.skipped > 0 ? ` · ${projectDocsInfo.skipped} skipped` : ''}</span>
     <button class="action-btn" style="margin-left:auto;" onclick="showTab('project-docs')">View Project Docs →</button>
   </div>
 </div>` : ''}
@@ -496,14 +574,18 @@ ${topFindings.length ? `
 <div class="card" style="margin-bottom:16px;">
   <div style="font-size:14px;font-weight:700;margin-bottom:12px;">Top Security Findings</div>
   ${topFindings.map((f) => `
-  <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+  <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F1F5F9;">
     ${sevBadge(f.severity)}
-    <div>
-      <div style="font-size:13px;font-weight:600;">${esc(f.title)}</div>
-      <div style="font-size:11px;color:#888;font-family:monospace;">${esc(f.path)}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:13px;font-weight:600;color:#0F172A;">${esc(f.title)}</div>
+      <div style="font-size:11px;color:#64748B;font-family:monospace;margin-top:2px;">
+        ${esc(f.path)}
+        <span style="color:#94A3B8;font-family:inherit;"> &middot; ${esc(f.category.replace(/_/g, ' '))}</span>
+      </div>
+      ${f.recommendation ? `<div style="font-size:12px;color:#475569;margin-top:3px;">${esc(shortText(f.recommendation, 132))}</div>` : ''}
     </div>
   </div>`).join('')}
-  <div style="margin-top:12px;"><button class="action-btn" onclick="showTab('security')">View All Findings →</button></div>
+  <div style="margin-top:12px;"><button class="action-btn" onclick="showTab('security')">View All Findings &#8594;</button></div>
 </div>` : ''}
 
 ${warnings.length ? `
@@ -514,7 +596,7 @@ ${warnings.length ? `
     ${sevBadge(w.severity)} <span>${esc(w.message)}</span>
   </div>`).join('')}
   <div style="margin-top:12px;"><button class="action-btn" onclick="showTab('map')">View Instruction Map →</button></div>
-</div>` : `<div class="card"><div style="color:#27ae60;font-size:14px;">✓ No readiness gaps detected.</div></div>`}
+</div>` : `<div class="card"><div style="color:#16A34A;font-size:14px;">&#10003; No readiness gaps detected.</div></div>`}
 `;
 }
 
@@ -524,6 +606,7 @@ function renderSecurityTab(manifest: Manifest): string {
   const { security } = manifest;
   const total = security.findings.length;
   const categories = [...new Set(security.findings.map((f) => f.category))].sort();
+  const postureTone = postureColor(security.posture);
 
   const groups: Array<[string, string, SecurityFinding[]]> = [
     ['High', 'high', security.findings.filter((f) => f.severity === 'high')],
@@ -539,17 +622,26 @@ function renderSecurityTab(manifest: Manifest): string {
   instructions, rules, skills, command files, prompt files, and MCP configs that AI coding agents may follow.
 </p>
 
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-  <span style="font-size:13px;color:#555;">Security Posture:</span>
-  ${postureChip(security.posture)}
-</div>
-
-<div class="summary-grid" style="margin-bottom:20px;">
-  <div class="summary-card"><div class="summary-num" style="color:${sevColor('high')}">${security.findingsCount.high}</div><div class="summary-label">High</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:${sevColor('medium')}">${security.findingsCount.medium}</div><div class="summary-label">Medium</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:${sevColor('low')}">${security.findingsCount.low}</div><div class="summary-label">Low</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:${sevColor('info')}">${security.findingsCount.info}</div><div class="summary-label">Info</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${total}</div><div class="summary-label">Total</div></div>
+<div class="assess-card primary-risk" style="border-top:4px solid ${postureTone};margin-bottom:18px;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+    <div>
+      <div class="assess-card-label">Risk Posture</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        ${postureChip(security.posture)}
+        <span style="font-size:20px;font-weight:800;color:#0F172A;">${esc(postureLabel(security.posture))}</span>
+      </div>
+      <div class="assessment-note">
+        ${total} finding${total !== 1 ? 's' : ''} across agent-facing files.
+        ${security.findingsCount.medium > 0 ? 'Medium findings are enough to keep the posture at Caution.' : ''}
+      </div>
+    </div>
+    <div class="severity-breakdown" style="width:min(100%,440px);margin-top:0;">
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('high')}">${security.findingsCount.high}</div><div class="severity-pill-label">High</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('medium')}">${security.findingsCount.medium}</div><div class="severity-pill-label">Medium</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('low')}">${security.findingsCount.low}</div><div class="severity-pill-label">Low</div></div>
+      <div class="severity-pill"><div class="severity-pill-num" style="color:${sevColor('info')}">${security.findingsCount.info}</div><div class="severity-pill-label">Info</div></div>
+    </div>
+  </div>
 </div>
 
 ${total > 0 ? `
@@ -582,7 +674,7 @@ ${groups.map(([label, severity, findings]) => findings.length === 0 ? '' : `
     return `<div class="finding-card" data-severity="${esc(f.severity)}" data-category="${esc(f.category)}" style="border-left-color:${sevColor(f.severity)};background:${sevBg(f.severity)}">
   <div class="row" style="margin-bottom:6px;">
     ${sevBadge(f.severity)}
-    <span style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">${esc(f.category)}</span>
+    <span style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;">${esc(f.category.replace(/_/g, ' '))}</span>
   </div>
   <div class="finding-title">${esc(f.title)}</div>
   <div class="finding-path"><code>${esc(f.path)}</code></div>
@@ -590,8 +682,8 @@ ${groups.map(([label, severity, findings]) => findings.length === 0 ? '' : `
   ${f.evidence ? `<div class="finding-evidence"><strong>Evidence:</strong> <code>${esc(f.evidence)}</code></div>` : ''}
   ${f.recommendation ? `<div class="finding-rec"><strong>Recommendation:</strong> ${esc(f.recommendation)}</div>` : ''}
   <div style="margin-top:10px;display:flex;gap:6px;align-items:center;">
-    <button class="copy-btn" onclick="copyById('${promptId}', this)">Copy Fix Prompt</button>
-    <button class="action-btn" style="font-size:11px;padding:4px 10px;" onclick="showTab('fix-prompts')">Fix Prompts →</button>
+    <button class="copy-btn" onclick="copyById('${promptId}', this)">Copy Remediation Prompt</button>
+    <button class="action-btn" style="font-size:11px;padding:4px 10px;" onclick="showTab('fix-prompts')">Remediation Prompts &#8594;</button>
   </div>
   <span id="${promptId}" style="display:none">${esc(promptText)}</span>
 </div>`;
@@ -626,7 +718,7 @@ function renderMapTab(manifest: Manifest): string {
 <p class="section-desc">Visual map of discovered agent instruction files grouped by type. Click any item to view its full detail in the Files tab. Warning indicators show files with security findings.</p>
 
 ${docsEnabled ? `
-<div class="card" style="margin-bottom:18px;border-left:4px solid #34495e;">
+<div class="card" style="margin-bottom:18px;border-left:4px solid #475569;">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <span style="font-size:13px;color:#444;">Project documentation is shown separately to keep this map focused on agent instruction files.</span>
     <button class="action-btn" style="margin-left:auto;" onclick="showTab('project-docs')">View ${docsCount} Project Doc${docsCount !== 1 ? 's' : ''} →</button>
@@ -663,7 +755,7 @@ function renderFileCard(file: AgentFile, filesWithFindings: Set<string>): string
     <div>
       <div class="file-card-title-row">
         ${typeBadge(file.type)}
-        ${hasWarn ? '<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
+        ${hasWarn ? '<span style="color:#D97706;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
         <span class="card-title">${esc(file.title || file.path)}</span>
       </div>
       <div class="card-path">${esc(file.path)}</div>
@@ -733,7 +825,7 @@ ${rules.map((f) => {
       <div class="file-card-title-row">
         ${typeBadge(f.type)}
         ${f.subtype === 'cursor_mdc' ? badge('MDC', '#6c5ce7') : ''}
-        ${hasWarn ? '<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
+        ${hasWarn ? '<span style="color:#D97706;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
         <span class="card-title">${esc(f.title || f.path)}</span>
       </div>
       <div class="card-path">${esc(f.path)}</div>
@@ -778,7 +870,7 @@ ${skills.map((f) => {
     <div>
       <div class="file-card-title-row">
         ${typeBadge(f.type)}
-        ${hasWarn ? '<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
+        ${hasWarn ? '<span style="color:#D97706;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
         <span class="card-title">${esc(f.title || f.path)}</span>
       </div>
       <div class="card-path">${esc(f.path)}</div>
@@ -824,20 +916,20 @@ ${mcpFiles.map((f) => {
     <div>
       <div class="file-card-title-row">
         ${typeBadge(f.type)}
-        ${fileMcpFindings.length ? `<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ ${fileMcpFindings.length} finding${fileMcpFindings.length !== 1 ? 's' : ''}</span>` : ''}
+        ${fileMcpFindings.length ? `<span style="color:#D97706;font-size:12px;font-weight:600;">⚠ ${fileMcpFindings.length} finding${fileMcpFindings.length !== 1 ? 's' : ''}</span>` : ''}
         <span class="card-title">${esc(f.path)}</span>
       </div>
       <div class="card-path">${esc(f.path)}</div>
     </div>
     <button class="copy-btn" data-copy="${esc(f.path)}" onclick="doCopy(this)">Copy Path</button>
   </div>
-  ${Array.isArray(m.servers) && m.servers.length ? `<div class="meta-block"><div class="meta-row"><span class="meta-label">Servers</span> ${(m.servers as string[]).map((s) => badge(s, '#555')).join(' ')}</div></div>` : ''}
+  ${Array.isArray(m.servers) && m.servers.length ? `<div class="meta-block"><div class="meta-row"><span class="meta-label">Servers</span> ${(m.servers as string[]).map((s) => badge(s, '#64748B')).join(' ')}</div></div>` : ''}
   ${fileMcpFindings.length ? `
   <div style="margin:12px 0;">
     <div style="font-size:13px;font-weight:600;margin-bottom:8px;">MCP Exposure Findings</div>
     ${fileMcpFindings.map((fi) => `
     <div class="finding-card" style="border-left-color:${sevColor(fi.severity)};background:${sevBg(fi.severity)}">
-      <div class="row" style="margin-bottom:4px;">${sevBadge(fi.severity)}<span style="font-size:11px;color:#666;">${esc(fi.category)}</span></div>
+      <div class="row" style="margin-bottom:4px;">${sevBadge(fi.severity)}<span style="font-size:11px;color:#64748B;">${esc(fi.category)}</span></div>
       <div class="finding-title" style="font-size:14px;">${esc(fi.title)}</div>
       ${fi.evidence ? `<div class="finding-evidence"><strong>Evidence:</strong> <code>${esc(fi.evidence)}</code></div>` : ''}
       ${fi.recommendation ? `<div class="finding-rec">${esc(fi.recommendation)}</div>` : ''}
@@ -876,7 +968,7 @@ function renderHeadingOutline(headings: DocHeading[]): string {
     .map(
       (h) =>
         `<li style="margin-left:${(h.level - 1) * 12}px;font-size:12px;color:#444;">
-           <span style="color:#888;font-size:10px;">H${h.level}</span> ${esc(h.text)}
+           <span style="color:#64748B;font-size:10px;">H${h.level}</span> ${esc(h.text)}
          </li>`
     )
     .join('');
@@ -900,13 +992,13 @@ function renderDocCard(doc: AgentFile, findingsByPath: Set<string>): string {
     <div>
       <div class="file-card-title-row">
         ${typeBadge('project_doc')}
-        ${hasWarn ? '<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
+        ${hasWarn ? '<span style="color:#D97706;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
         <span class="card-title">${esc(doc.title || doc.path)}</span>
       </div>
       <div class="card-path">${esc(doc.path)}</div>
     </div>
     <div class="row" style="flex-shrink:0;">
-      <span style="font-size:11px;color:#888;">${wordCount} words</span>
+      <span style="font-size:11px;color:#64748B;">${wordCount} words</span>
       <button class="copy-btn" data-copy="${esc(doc.path)}" onclick="doCopy(this)">Copy Path</button>
     </div>
   </div>
@@ -951,10 +1043,10 @@ function renderProjectDocsTab(manifest: Manifest): string {
 </p>
 
 <div class="summary-grid" style="margin-bottom:18px;">
-  <div class="summary-card"><div class="summary-num" style="color:#34495e">${info.scanned}</div><div class="summary-label">Scanned</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${info.total}</div><div class="summary-label">Discovered</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:${info.skipped > 0 ? sevColor('medium') : '#27ae60'}">${info.skipped}</div><div class="summary-label">Skipped</div></div>
-  <div class="summary-card"><div class="summary-num" style="color:#888">${info.maxDocs}</div><div class="summary-label">Max Docs</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:#475569">${info.scanned}</div><div class="summary-label">Scanned</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:#334155">${info.total}</div><div class="summary-label">Discovered</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:${info.skipped > 0 ? sevColor('medium') : '#16A34A'}">${info.skipped}</div><div class="summary-label">Skipped</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:#64748B">${info.maxDocs}</div><div class="summary-label">Max Docs</div></div>
 </div>
 
 ${docs.length ? `
@@ -983,11 +1075,11 @@ function renderFixPromptsTab(manifest: Manifest): string {
   const { security } = manifest;
 
   if (!security.findings.length) {
-    return `<h2 class="section-title">Fix Prompts</h2>
-<p class="empty-msg">No security findings — no fix prompts to generate.</p>`;
+    return `<h2 class="section-title">Remediation Prompts</h2>
+<p class="empty-msg">No security findings — no remediation prompts to generate.</p>`;
   }
 
-  return `<h2 class="section-title">Fix Prompts</h2>
+  return `<h2 class="section-title">Remediation Prompts</h2>
 <p class="section-desc">Copy these prompts and paste them to your AI coding agent to remediate security findings. Prompts are deterministic and based on finding category.</p>
 
 ${security.findings.map((f, i) => {
@@ -997,8 +1089,8 @@ ${security.findings.map((f, i) => {
 <div class="fix-prompt-card">
   <div class="row" style="margin-bottom:6px;flex-wrap:wrap;">
     ${sevBadge(f.severity)}
-    <span style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5px;">${esc(f.category)}</span>
-    <code style="font-size:11px;color:#888;">${esc(f.path)}</code>
+    <span style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;">${esc(f.category)}</span>
+    <code style="font-size:11px;color:#64748B;">${esc(f.path)}</code>
   </div>
   <div style="font-size:13px;font-weight:600;margin-bottom:8px;">${esc(f.title)}</div>
   <pre class="fix-prompt-text" id="${promptId}">${esc(promptText)}</pre>
@@ -1025,7 +1117,9 @@ function renderManifestTab(manifest: Manifest): string {
 
 export function renderReport(manifest: Manifest): string {
   const { repo, summary, security } = manifest;
-  const sc = scoreCol(summary.score);
+  const findingCount = totalFindings(security);
+  const sc = readinessColor(summary.score, findingCount);
+  const readiness = readinessLabel(summary.score);
 
   const docsEnabled = !!manifest.projectDocsInfo?.enabled;
   const docsCount = manifest.projectDocs?.length ?? 0;
@@ -1039,7 +1133,7 @@ export function renderReport(manifest: Manifest): string {
     { id: 'skills',       label: 'Skills' },
     { id: 'mcp',          label: 'MCP' },
     ...(docsEnabled ? [{ id: 'project-docs', label: docsCount ? `Project Docs (${docsCount})` : 'Project Docs' }] : []),
-    { id: 'fix-prompts',  label: 'Fix Prompts' },
+    { id: 'fix-prompts',  label: 'Remediation' },
     { id: 'manifest',     label: 'Raw Manifest' },
   ];
 
@@ -1065,10 +1159,19 @@ export function renderReport(manifest: Manifest): string {
         &nbsp;·&nbsp; Scanned ${new Date(repo.scannedAt).toLocaleString()}
       </div>
     </div>
-    <div class="header-score">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#adb5bd;margin-bottom:4px;">Readiness Score</div>
-      <div class="score-num-large" style="color:${sc}">${summary.score}<span class="score-suffix"> / 100</span></div>
-      <div style="margin-top:8px;">${postureChip(security.posture)}</div>
+    <div class="header-right">
+      <div class="header-metric header-score">
+        <div class="header-score-label">Readiness</div>
+        <div class="score-num-large" style="color:${sc}">${summary.score}<span class="score-suffix"> / 100</span></div>
+        <div style="font-size:12px;color:#CBD5E1;margin-top:4px;font-weight:600;">${esc(readiness)}</div>
+        <div class="header-metric-note">Artifact coverage, not risk clearance.</div>
+      </div>
+      <div class="header-metric header-posture">
+        <div class="header-posture-label">Risk Posture</div>
+        <div style="margin:4px 0 6px;">${postureChip(security.posture)}</div>
+        <div class="header-finding-count">${findingCount} finding${findingCount !== 1 ? 's' : ''}</div>
+        <div class="header-metric-note">Security posture from findings.</div>
+      </div>
     </div>
   </div>
 </div>

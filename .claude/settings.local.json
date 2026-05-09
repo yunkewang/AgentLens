@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(curl -sL https://raw.githubusercontent.com/affaan-m/everything-claude-code/main/README.md)",
+      "Bash(npm run:*)",
+      "Bash(node:*)"
+    ]
+  }
+}

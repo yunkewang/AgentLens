@@ -10,6 +10,88 @@ No backend. No account. No source upload. The report works offline as a portable
 
 ---
 
+## Demo: everything-claude-code
+
+For the best first impression, use a repo with multiple agent artifacts. Minimal repos may only produce a small report, while richer Claude Code repos better demonstrate AgentLens' ability to map instructions, rules, skills, MCP configs, prompts, security findings, and remediation guidance.
+
+```bash
+agentlens build https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code
+open ./agentlens-report-claude-code/report.html
+```
+
+```
+AgentLens build complete.
+
+Repo: everything-claude-code
+Agent Readiness Score: 100 / 100
+Security Posture: caution
+
+Found:
+  - Generic Instructions: 2
+  - Rules: 89
+  - Skills: 1
+  - MCP Configs: 1
+  - Prompts / Commands: 3
+
+Security Review:
+  - High: 0
+  - Medium: 24
+  - Low: 6
+  - Info: 4
+
+Report:
+  ./agentlens-report-claude-code/report.html
+```
+
+The generated report includes the following sections:
+
+<table>
+<tr>
+<td width="50%"><b>Overview</b></td>
+<td width="50%"><b>Security Review</b></td>
+</tr>
+<tr>
+<td>Agent Readiness Score with breakdown, Security Risk Posture with finding counts, and artifact inventory across instructions, rules, skills, MCP configs, and prompts.</td>
+<td>Filterable findings by severity and category. Each finding includes evidence, file path, recommendation, and a one-click copy button for remediation prompts.</td>
+</tr>
+<tr>
+<td width="50%"><b>Instruction Map</b></td>
+<td width="50%"><b>MCP Exposure</b></td>
+</tr>
+<tr>
+<td>Visual grouped map of all discovered agent instruction files. Click any item to jump to its full detail. Warning indicators highlight files with security findings.</td>
+<td>MCP server configs with inline exposure findings. Shows registered servers, detected SaaS integrations, and permission scope analysis.</td>
+</tr>
+<tr>
+<td width="50%"><b>Rules</b></td>
+<td width="50%"><b>Skills</b></td>
+</tr>
+<tr>
+<td>MDC rule files with glob patterns, description, and alwaysApply settings. Rendered markdown content with raw view toggle.</td>
+<td>Skill folders with SKILL.md definitions, related files, and rendered content. Includes risk indicators for skills with security findings.</td>
+</tr>
+<tr>
+<td width="50%"><b>Remediation Prompts</b></td>
+<td width="50%"><b>Raw Manifest</b></td>
+</tr>
+<tr>
+<td>Copyable prompts for each security finding. Paste directly into your AI coding agent to remediate issues. Prompts are deterministic and category-based.</td>
+<td>Machine-readable manifest JSON embedded in the report. Same data written to manifest.json for CI integration and automation.</td>
+</tr>
+</table>
+
+---
+
+## Example Report
+
+AgentLens generates a local interactive HTML report with readiness scoring, risk posture, artifact inventory, findings, and remediation guidance.
+
+![AgentLens overview report](docs/images/agentlens-overview.png)
+
+![AgentLens security findings](docs/images/agentlens-security.png)
+
+---
+
 ## Why HTML?
 
 Agent instruction files are not meant to be reviewed linearly.
@@ -19,13 +101,13 @@ HTML is better for exploring, filtering, auditing, and acting on them.
 
 AgentLens generates an interactive HTML artifact with:
 
-- Agent Readiness scoring
-- Security Review findings
-- Instruction Map
+- Separate Agent Readiness and Security Risk assessment
+- Filterable security findings with remediation prompts
+- Instruction Map for visual artifact discovery
 - MCP exposure summary
-- Searchable file details
-- Collapsible raw content
-- Copyable fix prompts
+- Searchable file details with rendered content
+- Collapsible raw content views
+- Copyable remediation prompts
 - Embedded machine-readable manifest data
 
 The report remains local-first and portable:
@@ -42,19 +124,15 @@ The report remains local-first and portable:
 
 AgentLens reviews the agent instruction layer of a repository.
 
-It looks for:
-
-- project-wide instructions
-- AI coding rules
-- skill folders
-- command files
-- prompt files
-- MCP configs
-- security boundary guidance
-- risky instruction patterns
-- dangerous commands
-- possible secret references
-- broad MCP exposure
+| Category | What It Looks For |
+|----------|-------------------|
+| **Instructions** | AGENTS.md, CLAUDE.md, GEMINI.md, copilot-instructions.md |
+| **Rules** | .cursor/rules/*.mdc, .cursorrules, rules/**/*.md |
+| **Skills & Commands** | .claude/skills/*/SKILL.md, .claude/commands/*.md |
+| **MCP Configs** | .mcp.json, mcp.json, .cursor/mcp.json |
+| **Prompts** | prompts/*.md, prompts/**/*.md |
+| **Security Signals** | Secrets, dangerous commands, weak boundaries, override language, data exfiltration, private environment details |
+| **MCP Exposure** | Broad filesystem access, external SaaS tools, shell/terminal servers |
 
 AgentLens does not perform general application SAST. It does not scan your app code for vulnerabilities. It focuses on the instructions and tool configs that AI coding agents may follow.
 
@@ -66,15 +144,17 @@ AgentLens includes a deterministic, local security review for agent instruction 
 
 It can flag:
 
-- possible secrets or credential references
-- dangerous shell commands
-- weak agent boundaries
-- prompt-injection-like override language
-- external data movement instructions
-- private environment details
-- broad MCP filesystem access
-- external MCP tool exposure
-- missing security boundary guidance
+| Finding Type | Example |
+|-------------|---------|
+| Possible secrets | API keys, tokens, credentials in instruction files |
+| Dangerous commands | `rm -rf`, `curl \| bash`, `chmod 777` in agent instructions |
+| Weak boundaries | "read all files", "run any command", "delete anything" |
+| Instruction overrides | Language that bypasses safety policies or higher-priority instructions |
+| Data exfiltration | Instructions to upload, send, or post repo content externally |
+| Private environment | Internal URLs, network addresses, environment identifiers |
+| MCP filesystem exposure | Broad filesystem access via MCP servers |
+| External MCP tools | SaaS and cloud MCP servers with API token access |
+| Missing security guidance | No security boundary section in AGENTS.md |
 
 > "Your code may be secure, but your agent instructions may not be."
 
@@ -86,49 +166,13 @@ The scanner is:
 
 ---
 
-## Supported Files
-
-### Project-wide Instructions
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `GEMINI.md`
-- `.github/copilot-instructions.md`
-
-### Rules
-
-- `.cursor/rules/*.mdc`
-- `.cursor/rules/**/*.mdc`
-- `.cursorrules`
-- `rules/**/*.md`
-
-### Skills and Commands
-
-- `.claude/skills/*/SKILL.md`
-- `.claude/skills/**/SKILL.md`
-- `.claude/commands/*.md`
-- `.claude/commands/**/*.md`
-
-### MCP Configs
-
-- `.mcp.json`
-- `mcp.json`
-- `.cursor/mcp.json`
-
-### Prompts
-
-- `prompts/*.md`
-- `prompts/**/*.md`
-
----
-
 ## Usage
 
-> AgentLens is not yet published to npm. For now, install it by cloning and building this repository locally (see below). Once published, you'll be able to install it globally with `npm install -g agentlens` or run it directly with `npx agentlens`.
+> AgentLens is not yet published to npm. For now, install it by cloning and building this repository locally (see below). Do not use `npx agentlens` until the package has been published.
 
-### Local Development Usage
+### Local Development: Install AgentLens
 
-Clone and build AgentLens locally:
+Clone and build AgentLens itself locally:
 
 ```bash
 git clone https://github.com/yunkewang/agentlens
@@ -142,7 +186,7 @@ This installs the `agentlens` command globally on your machine.
 
 ### Running AgentLens Against a Target Repo
 
-You do **not** need to clone the target repository yourself. AgentLens accepts a public GitHub URL directly, clones the target repo internally into a temporary directory, scans it, and writes a self-contained HTML report to the `--out` directory.
+You do **not** need to manually clone the target repository. AgentLens accepts a public GitHub URL directly, clones the target repo internally into a temporary directory, scans it, and writes a self-contained HTML report to the `--out` directory.
 
 **Scan a public GitHub repo (recommended):**
 
@@ -190,8 +234,8 @@ agentlens scan ./my-repo --out ./agentlens-scan
 agentlens serve https://github.com/affaan-m/everything-claude-code --out ./agentlens-report-claude-code --port 4321
 ```
 
-**`build`** generates `report.html` and `manifest.json` in the output folder.  
-**`serve`** builds the report and opens it through a local web server.  
+**`build`** generates `report.html` and `manifest.json` in the output folder.
+**`serve`** builds the report and opens it through a local web server.
 **`--port`** belongs to `serve`, not `build`.
 
 Remote GitHub URL scanning supports public repos only. Private repos can be scanned by cloning locally first.
@@ -251,57 +295,13 @@ AgentLens writes:
 
 ---
 
-## Example Report Sections
+## Agent Readiness vs. Security Risk
 
-The HTML report includes:
+AgentLens separates two independent assessments:
 
-| Section | Description |
-|---------|-------------|
-| **Overview** | Readiness score, security posture, file counts, top findings |
-| **Security Review** | Filterable findings by severity and category, with fix prompt buttons |
-| **Instruction Map** | Visual grouped map of all discovered instruction files |
-| **Files** | Searchable file cards with rendered content and raw view |
-| **Rules** | MDC rule files with glob patterns and metadata |
-| **Skills** | Skill folders with SKILL.md and related files |
-| **MCP** | MCP server configs with exposure findings highlighted |
-| **Project Docs** *(when `--include-docs` is used)* | README and Markdown docs grouped by top-level folder, with heading outlines and rendered markdown |
-| **Fix Prompts** | Copyable remediation prompts for each security finding |
-| **Raw Manifest** | Pretty-printed embedded manifest JSON |
+### Agent Readiness Score (0–100)
 
----
-
-## Example Terminal Output
-
-```
-AgentLens build complete.
-
-Repo: examples/sample-agent-repo
-Agent Readiness Score: 85 / 100
-Security Posture: caution
-
-Found:
-  - Generic Instructions: 2
-  - Rules: 1
-  - Skills: 1
-  - MCP Configs: 1
-  - Prompts / Commands: 0
-
-Security Review:
-  - High: 0
-  - Medium: 1
-  - Low: 1
-  - Info: 0
-
-Report:
-  .agentlens/report.html
-
-Manifest:
-  .agentlens/manifest.json
-```
-
----
-
-## Agent Readiness Score
+Measures whether agent artifacts are present and complete. A high score means the repo has the right files in place — it does **not** mean the repo is safe.
 
 | Factor | Points |
 |--------|--------|
@@ -315,6 +315,18 @@ Manifest:
 | Style/convention guidance | +5 |
 
 Maximum: 100 points.
+
+### Security Risk Posture
+
+Measures risk signals in the agent instruction layer. A repo can score 100/100 on readiness while still having a "Caution" or "Needs Review" risk posture.
+
+| Posture | Meaning |
+|---------|---------|
+| **Clean** | No security findings detected |
+| **Caution** | Medium-severity findings present — review recommended |
+| **Needs Review** | High-severity findings present — action required |
+
+For example, [everything-claude-code](https://github.com/affaan-m/everything-claude-code) scores 100/100 on readiness (all artifact types present) but shows a "Caution" risk posture with 24 medium-severity findings related to MCP exposure and instruction patterns.
 
 ---
 
