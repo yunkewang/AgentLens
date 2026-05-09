@@ -48,7 +48,7 @@ export async function runScan(
 }
 
 function printScanSummary(manifest: Manifest, manifestPath: string): void {
-  const { repo, summary, warnings } = manifest;
+  const { repo, summary, security, warnings } = manifest;
 
   logger.plain('');
   logger.bold('AgentLens scan complete.');
@@ -67,6 +67,19 @@ function printScanSummary(manifest: Manifest, manifestPath: string): void {
 
   const total = counts.genericInstructions + counts.rules + counts.skills + counts.mcpConfigs + counts.prompts;
   if (total === 0) logger.warn('  No agent files found.');
+
+  logger.plain('');
+  logger.bold('Security Review:');
+  const { findingsCount } = security;
+  const totalFindings = findingsCount.high + findingsCount.medium + findingsCount.low + findingsCount.info;
+  if (totalFindings === 0) {
+    logger.plain('  No findings detected by current rule set.');
+  } else {
+    if (findingsCount.high) logger.warn(`  - High: ${findingsCount.high}`);
+    if (findingsCount.medium) logger.plain(`  - Medium: ${findingsCount.medium}`);
+    if (findingsCount.low) logger.plain(`  - Low: ${findingsCount.low}`);
+    if (findingsCount.info) logger.dim(`  - Info: ${findingsCount.info}`);
+  }
 
   if (warnings.length) {
     logger.plain('');
