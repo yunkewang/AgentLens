@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'fs/promises';
 import { scanRepo } from '../core/scanner';
 import { applyRisks } from '../core/riskScanner';
 import { buildManifest } from '../core/manifest';
+import { scanProjectDocs } from '../core/projectDocScanner';
 import { writeJson } from '../utils/file';
 import { logger } from '../utils/logger';
 import { isGitHubUrl, repoNameFromPath, repoNameFromUrl, resolveOutputDir } from '../utils/paths';
@@ -37,7 +38,21 @@ export async function runScan(
 
   const rawFiles = await scanRepo(repoPath);
   const files = applyRisks(rawFiles);
-  const manifest = buildManifest(files, repoSource, repoName);
+
+  let projectDocs: Awaited<ReturnType<typeof scanProjectDocs>> | undefined;
+  if (options.includeDocs) {
+    const excludePaths = new Set(files.map((f) => f.path));
+    projectDocs = await scanProjectDocs(repoPath, excludePaths, {
+      maxDocs: options.maxDocs,
+      maxFileSize: options.maxFileSize,
+    });
+  }
+
+  const manifest = buildManifest(files, repoSource, repoName, {
+    extraWarnings: projectDocs?.warnings ?? [],
+    projectDocs: projectDocs?.docs,
+    projectDocsInfo: projectDocs?.info,
+  });
 
   const manifestPath = path.join(outputDir, 'manifest.json');
   await writeJson(manifestPath, manifest);
@@ -72,6 +87,9 @@ export function printScanSummary(
   logger.plain(`  - Skills: ${counts.skills}`);
   logger.plain(`  - MCP Configs: ${counts.mcpConfigs}`);
   logger.plain(`  - Prompts / Commands: ${counts.prompts}`);
+  if (manifest.projectDocsInfo?.enabled) {
+    logger.plain(`  - Project Docs: ${manifest.projectDocsInfo.scanned} (of ${manifest.projectDocsInfo.total} discovered)`);
+  }
 
   logger.plain('');
   logger.plain('Security Review:');

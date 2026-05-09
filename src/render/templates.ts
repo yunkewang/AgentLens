@@ -1,4 +1,4 @@
-import type { AgentFile, Manifest, Risk, SecurityFinding, Warning } from '../core/types';
+import type { AgentFile, DocHeading, Manifest, Risk, SecurityFinding, Warning } from '../core/types';
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -34,7 +34,7 @@ function scoreCol(n: number): string {
 function typeColor(t: string): string {
   const m: Record<string, string> = {
     generic_instruction: '#2980b9', rule: '#8e44ad', skill: '#16a085',
-    mcp_config: '#d35400', prompt: '#2c3e50',
+    mcp_config: '#d35400', prompt: '#2c3e50', project_doc: '#34495e',
   };
   return m[t] ?? '#555';
 }
@@ -42,7 +42,7 @@ function typeColor(t: string): string {
 function typeLabel(t: string): string {
   const m: Record<string, string> = {
     generic_instruction: 'Instruction', rule: 'Rule', skill: 'Skill',
-    mcp_config: 'MCP', prompt: 'Prompt',
+    mcp_config: 'MCP', prompt: 'Prompt', project_doc: 'Doc',
   };
   return m[t] ?? t;
 }
@@ -328,6 +328,25 @@ const JS = `
   }
   window.applyFilesFilter = applyFilesFilter;
 
+  /* Project Docs tab filter */
+  function applyDocsFilter() {
+    var q = ((document.getElementById('docs-q') || {}).value || '').toLowerCase();
+    var grp = ((document.getElementById('docs-group') || {}).value || '');
+    document.querySelectorAll('.doc-card').forEach(function (card) {
+      var grpOk = !grp || card.getAttribute('data-group') === grp;
+      var qOk = !q || (card.textContent || '').toLowerCase().includes(q);
+      card.style.display = (grpOk && qOk) ? '' : 'none';
+    });
+    document.querySelectorAll('.doc-group').forEach(function (g) {
+      var vis = Array.from(g.querySelectorAll('.doc-card')).some(function (c) { return c.style.display !== 'none'; });
+      g.style.display = vis ? '' : 'none';
+    });
+    var visible = Array.from(document.querySelectorAll('.doc-card')).filter(function (c) { return c.style.display !== 'none'; }).length;
+    var counter = document.getElementById('docs-count');
+    if (counter) counter.textContent = visible + ' doc' + (visible !== 1 ? 's' : '');
+  }
+  window.applyDocsFilter = applyDocsFilter;
+
   /* Jump from instruction map to file in Files tab */
   function jumpToFile(path) {
     showTab('files');
@@ -345,7 +364,7 @@ const JS = `
 
   /* Init: show tab from URL hash or default to overview */
   document.addEventListener('DOMContentLoaded', function () {
-    var validTabs = ['overview', 'security', 'map', 'files', 'rules', 'skills', 'mcp', 'fix-prompts', 'manifest'];
+    var validTabs = ['overview', 'security', 'map', 'files', 'rules', 'skills', 'mcp', 'project-docs', 'fix-prompts', 'manifest'];
     var hash = location.hash.replace('#', '');
     showTab(validTabs.indexOf(hash) !== -1 ? hash : 'overview');
   });
@@ -421,11 +440,13 @@ function rawBlock(id: string, content: string): string {
 // ── Overview tab ──────────────────────────────────────────────────────────────
 
 function renderOverview(manifest: Manifest): string {
-  const { repo: _repo, summary, security, files, warnings } = manifest;
+  const { repo: _repo, summary, security, files, warnings, projectDocs, projectDocsInfo } = manifest;
   const sc = scoreCol(summary.score);
   const totalFiles = files.length;
   const totalFindings = security.findingsCount.high + security.findingsCount.medium + security.findingsCount.low + security.findingsCount.info;
   const topFindings = security.findings.filter((f) => f.severity === 'high' || f.severity === 'medium').slice(0, 3);
+  const docsEnabled = !!projectDocsInfo?.enabled;
+  const docsCount = projectDocs?.length ?? 0;
 
   return `<h2 class="section-title">Overview</h2>
 
@@ -458,7 +479,18 @@ function renderOverview(manifest: Manifest): string {
   <div class="summary-card"><div class="summary-num" style="color:#d35400">${summary.counts.mcpConfigs}</div><div class="summary-label">MCP Configs</div></div>
   <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${summary.counts.prompts}</div><div class="summary-label">Prompts</div></div>
   <div class="summary-card"><div class="summary-num" style="color:${totalFindings > 0 ? sevColor('medium') : '#27ae60'}">${totalFindings}</div><div class="summary-label">Findings</div></div>
+  ${docsEnabled ? `<div class="summary-card"><div class="summary-num" style="color:#34495e">${docsCount}</div><div class="summary-label">Project Docs</div></div>` : ''}
 </div>
+
+${docsEnabled ? `
+<div class="card" style="margin-bottom:16px;border-left:4px solid #34495e;">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:13px;font-weight:600;">Project documentation scanning enabled</span>
+    ${badge('--include-docs', '#34495e')}
+    <span style="font-size:12px;color:#666;">${docsCount} doc${docsCount !== 1 ? 's' : ''} scanned${projectDocsInfo && projectDocsInfo.skipped > 0 ? ` · ${projectDocsInfo.skipped} skipped` : ''}</span>
+    <button class="action-btn" style="margin-left:auto;" onclick="showTab('project-docs')">View Project Docs →</button>
+  </div>
+</div>` : ''}
 
 ${topFindings.length ? `
 <div class="card" style="margin-bottom:16px;">
@@ -587,8 +619,19 @@ function renderMapTab(manifest: Manifest): string {
     return `<h2 class="section-title">Instruction Map</h2><p class="empty-msg">No agent instruction files discovered.</p>`;
   }
 
+  const docsEnabled = !!manifest.projectDocsInfo?.enabled;
+  const docsCount = manifest.projectDocs?.length ?? 0;
+
   return `<h2 class="section-title">Instruction Map</h2>
 <p class="section-desc">Visual map of discovered agent instruction files grouped by type. Click any item to view its full detail in the Files tab. Warning indicators show files with security findings.</p>
+
+${docsEnabled ? `
+<div class="card" style="margin-bottom:18px;border-left:4px solid #34495e;">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span style="font-size:13px;color:#444;">Project documentation is shown separately to keep this map focused on agent instruction files.</span>
+    <button class="action-btn" style="margin-left:auto;" onclick="showTab('project-docs')">View ${docsCount} Project Doc${docsCount !== 1 ? 's' : ''} →</button>
+  </div>
+</div>` : ''}
 
 ${groups.map((g) => `
 <div class="map-group">
@@ -805,6 +848,135 @@ ${mcpFiles.map((f) => {
   }).join('')}`;
 }
 
+// ── Project Docs tab ──────────────────────────────────────────────────────────
+
+const DOC_GROUP_ORDER = ['root', 'docs', 'guides', 'examples', '.ai', '.github', 'other'];
+const DOC_GROUP_LABELS: Record<string, string> = {
+  root: 'Root',
+  docs: 'docs',
+  guides: 'guides',
+  examples: 'examples',
+  '.ai': '.ai',
+  '.github': '.github',
+  other: 'Other',
+};
+
+function topGroupForDoc(p: string): string {
+  const parts = p.split('/');
+  if (parts.length === 1) return 'root';
+  const top = parts[0];
+  if (['docs', 'guides', 'examples', '.ai', '.github'].includes(top)) return top;
+  return 'other';
+}
+
+function renderHeadingOutline(headings: DocHeading[]): string {
+  if (!headings.length) return '';
+  const items = headings
+    .slice(0, 30)
+    .map(
+      (h) =>
+        `<li style="margin-left:${(h.level - 1) * 12}px;font-size:12px;color:#444;">
+           <span style="color:#888;font-size:10px;">H${h.level}</span> ${esc(h.text)}
+         </li>`
+    )
+    .join('');
+  return `<details class="collapsible" open>
+    <summary><span class="toggle-icon">▶</span>Heading outline (${headings.length})</summary>
+    <ul style="list-style:none;margin:6px 0 0 0;padding:0;">${items}</ul>
+  </details>`;
+}
+
+function renderDocCard(doc: AgentFile, findingsByPath: Set<string>): string {
+  const id = 'doc-' + fileUid(doc.path);
+  const rawId = `rawdoc-${id}`;
+  const headings = (doc.metadata.headings as DocHeading[]) ?? [];
+  const wordCount = (doc.metadata.wordCount as number) ?? 0;
+  const group = topGroupForDoc(doc.path);
+  const hasWarn = findingsByPath.has(doc.path);
+
+  return `
+<div class="card doc-card" id="${id}" data-path="${esc(doc.path)}" data-group="${esc(group)}">
+  <div class="file-card-header">
+    <div>
+      <div class="file-card-title-row">
+        ${typeBadge('project_doc')}
+        ${hasWarn ? '<span style="color:#e67e22;font-size:12px;font-weight:600;">⚠ findings</span>' : ''}
+        <span class="card-title">${esc(doc.title || doc.path)}</span>
+      </div>
+      <div class="card-path">${esc(doc.path)}</div>
+    </div>
+    <div class="row" style="flex-shrink:0;">
+      <span style="font-size:11px;color:#888;">${wordCount} words</span>
+      <button class="copy-btn" data-copy="${esc(doc.path)}" onclick="doCopy(this)">Copy Path</button>
+    </div>
+  </div>
+  ${renderHeadingOutline(headings)}
+  ${doc.contentPreview ? `<details class="collapsible" open>
+    <summary><span class="toggle-icon">▶</span>Content preview</summary>
+    <p class="card-desc" style="margin-top:6px;">${esc(doc.contentPreview)}</p>
+  </details>` : ''}
+  ${collapsible('Rendered markdown', doc.renderedContent ? `<div class="rendered-md">${doc.renderedContent}</div>` : `<pre class="code-block">${esc(doc.rawContent)}</pre>`, false)}
+  ${collapsible('Raw content', rawBlock(rawId, doc.rawContent), false)}
+</div>`;
+}
+
+function renderProjectDocsTab(manifest: Manifest): string {
+  const info = manifest.projectDocsInfo;
+  const docs = manifest.projectDocs ?? [];
+
+  if (!info?.enabled) {
+    return `<h2 class="section-title">Project Docs</h2>
+<p class="section-desc">Project documentation scanning is disabled. Re-run AgentLens with <code>--include-docs</code> to also discover README and Markdown documentation files alongside agent instruction files.</p>
+<pre class="code-block">agentlens build &lt;input&gt; --out &lt;path&gt; --include-docs</pre>`;
+  }
+
+  const findingsByPath = new Set(
+    manifest.security.findings
+      .filter((f) => f.source === 'project_doc')
+      .map((f) => f.path)
+  );
+
+  const grouped: Record<string, AgentFile[]> = {};
+  for (const doc of docs) {
+    const g = topGroupForDoc(doc.path);
+    (grouped[g] ??= []).push(doc);
+  }
+
+  const presentGroups = DOC_GROUP_ORDER.filter((g) => grouped[g]?.length);
+
+  return `<h2 class="section-title">Project Docs</h2>
+<p class="section-desc">
+  Project documentation files discovered with <code>--include-docs</code>. AgentLens still focuses on the agent instruction layer
+  by default — these docs are listed here so you can also see how the project explains itself.
+</p>
+
+<div class="summary-grid" style="margin-bottom:18px;">
+  <div class="summary-card"><div class="summary-num" style="color:#34495e">${info.scanned}</div><div class="summary-label">Scanned</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:#2c3e50">${info.total}</div><div class="summary-label">Discovered</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:${info.skipped > 0 ? sevColor('medium') : '#27ae60'}">${info.skipped}</div><div class="summary-label">Skipped</div></div>
+  <div class="summary-card"><div class="summary-num" style="color:#888">${info.maxDocs}</div><div class="summary-label">Max Docs</div></div>
+</div>
+
+${docs.length ? `
+<div class="filter-bar">
+  <span class="filter-label">Search:</span>
+  <input id="docs-q" type="search" placeholder="Search by path, title, content..." oninput="applyDocsFilter()" />
+  <select id="docs-group" onchange="applyDocsFilter()">
+    <option value="">All folders</option>
+    ${presentGroups.map((g) => `<option value="${esc(g)}">${esc(DOC_GROUP_LABELS[g] ?? g)}</option>`).join('')}
+  </select>
+  <span id="docs-count" class="filter-count">${docs.length} doc${docs.length !== 1 ? 's' : ''}</span>
+</div>
+
+${presentGroups.map((g) => `
+<div class="doc-group" data-group="${esc(g)}">
+  <div class="map-group-title">${esc(DOC_GROUP_LABELS[g] ?? g)} (${grouped[g].length})</div>
+  ${grouped[g].map((d) => renderDocCard(d, findingsByPath)).join('')}
+</div>`).join('')}
+` : '<p class="empty-msg">No project documentation files were discovered.</p>'}
+`;
+}
+
 // ── Fix Prompts tab ───────────────────────────────────────────────────────────
 
 function renderFixPromptsTab(manifest: Manifest): string {
@@ -855,6 +1027,9 @@ export function renderReport(manifest: Manifest): string {
   const { repo, summary, security } = manifest;
   const sc = scoreCol(summary.score);
 
+  const docsEnabled = !!manifest.projectDocsInfo?.enabled;
+  const docsCount = manifest.projectDocs?.length ?? 0;
+
   const tabs = [
     { id: 'overview',     label: 'Overview' },
     { id: 'security',     label: security.findings.length ? `Security (${security.findings.length})` : 'Security' },
@@ -863,6 +1038,7 @@ export function renderReport(manifest: Manifest): string {
     { id: 'rules',        label: 'Rules' },
     { id: 'skills',       label: 'Skills' },
     { id: 'mcp',          label: 'MCP' },
+    ...(docsEnabled ? [{ id: 'project-docs', label: docsCount ? `Project Docs (${docsCount})` : 'Project Docs' }] : []),
     { id: 'fix-prompts',  label: 'Fix Prompts' },
     { id: 'manifest',     label: 'Raw Manifest' },
   ];
@@ -911,6 +1087,7 @@ export function renderReport(manifest: Manifest): string {
   <div id="tab-rules"       class="tab-panel">${renderRulesTab(manifest)}</div>
   <div id="tab-skills"      class="tab-panel">${renderSkillsTab(manifest)}</div>
   <div id="tab-mcp"         class="tab-panel">${renderMcpTab(manifest)}</div>
+  ${docsEnabled ? `<div id="tab-project-docs" class="tab-panel">${renderProjectDocsTab(manifest)}</div>` : ''}
   <div id="tab-fix-prompts" class="tab-panel">${renderFixPromptsTab(manifest)}</div>
   <div id="tab-manifest"    class="tab-panel">${renderManifestTab(manifest)}</div>
 </div>
