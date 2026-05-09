@@ -86,9 +86,9 @@ The generated report includes the following sections:
 
 AgentLens generates a local interactive HTML report with readiness scoring, risk posture, artifact inventory, findings, and remediation guidance.
 
-![AgentLens overview report](docs/images/agentlens-overview.png)
+![AgentLens overview report](docs/images/agentlens-overview-current.png)
 
-![AgentLens security findings](docs/images/agentlens-security.png)
+![AgentLens security findings](docs/images/agentlens-security-current.png)
 
 ---
 
