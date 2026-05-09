@@ -42,44 +42,44 @@ export async function runScan(
   const manifestPath = path.join(outputDir, 'manifest.json');
   await writeJson(manifestPath, manifest);
 
-  printScanSummary(manifest, manifestPath);
+  if (!options.silent) {
+    printScanSummary(manifest, manifestPath);
+  }
 
   return { manifest, repoPath, outputDir, tempDir };
 }
 
-function printScanSummary(manifest: Manifest, manifestPath: string): void {
+export function printScanSummary(
+  manifest: Manifest,
+  manifestPath: string,
+  opts: { mode?: 'scan' | 'build'; reportPath?: string } = {}
+): void {
   const { repo, summary, security, warnings } = manifest;
+  const mode = opts.mode ?? 'scan';
 
   logger.plain('');
-  logger.bold('AgentLens scan complete.');
+  logger.bold(`AgentLens ${mode} complete.`);
   logger.plain('');
   logger.plain(`Repo: ${repo.source}`);
   logger.plain(`Agent Readiness Score: ${summary.score} / 100`);
+  logger.plain(`Security Posture: ${security.posture}`);
   logger.plain('');
   logger.plain('Found:');
 
   const { counts } = summary;
-  if (counts.genericInstructions) logger.plain(`  - ${counts.genericInstructions} instruction file(s) (AGENTS.md, CLAUDE.md, etc.)`);
-  if (counts.rules) logger.plain(`  - ${counts.rules} rule file(s)`);
-  if (counts.skills) logger.plain(`  - ${counts.skills} skill folder(s)`);
-  if (counts.mcpConfigs) logger.plain(`  - ${counts.mcpConfigs} MCP config(s)`);
-  if (counts.prompts) logger.plain(`  - ${counts.prompts} prompt/command file(s)`);
-
-  const total = counts.genericInstructions + counts.rules + counts.skills + counts.mcpConfigs + counts.prompts;
-  if (total === 0) logger.warn('  No agent files found.');
+  logger.plain(`  - Generic Instructions: ${counts.genericInstructions}`);
+  logger.plain(`  - Rules: ${counts.rules}`);
+  logger.plain(`  - Skills: ${counts.skills}`);
+  logger.plain(`  - MCP Configs: ${counts.mcpConfigs}`);
+  logger.plain(`  - Prompts / Commands: ${counts.prompts}`);
 
   logger.plain('');
-  logger.bold('Security Review:');
+  logger.plain('Security Review:');
   const { findingsCount } = security;
-  const totalFindings = findingsCount.high + findingsCount.medium + findingsCount.low + findingsCount.info;
-  if (totalFindings === 0) {
-    logger.plain('  No findings detected by current rule set.');
-  } else {
-    if (findingsCount.high) logger.warn(`  - High: ${findingsCount.high}`);
-    if (findingsCount.medium) logger.plain(`  - Medium: ${findingsCount.medium}`);
-    if (findingsCount.low) logger.plain(`  - Low: ${findingsCount.low}`);
-    if (findingsCount.info) logger.dim(`  - Info: ${findingsCount.info}`);
-  }
+  logger.plain(`  - High: ${findingsCount.high}`);
+  logger.plain(`  - Medium: ${findingsCount.medium}`);
+  logger.plain(`  - Low: ${findingsCount.low}`);
+  logger.plain(`  - Info: ${findingsCount.info}`);
 
   if (warnings.length) {
     logger.plain('');
@@ -90,6 +90,14 @@ function printScanSummary(manifest: Manifest, manifestPath: string): void {
   }
 
   logger.plain('');
-  logger.dim(`Manifest: ${manifestPath}`);
+
+  if (opts.reportPath) {
+    logger.plain('Report:');
+    logger.plain(`  ${opts.reportPath}`);
+    logger.plain('');
+  }
+
+  logger.plain('Manifest:');
+  logger.plain(`  ${manifestPath}`);
   logger.plain('');
 }
