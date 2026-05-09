@@ -1,0 +1,13 @@
+---
+description: Example TypeScript project rule
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+alwaysApply: false
+---
+
+When editing TypeScript files:
+- Preserve existing public APIs unless explicitly asked to change them.
+- Run type checking before finalizing changes.
+- Prefer small, reviewable changes.
+- Add tests for new behavior when practical.
