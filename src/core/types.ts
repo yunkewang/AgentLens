@@ -104,6 +104,7 @@ export interface Manifest {
 export interface ScanOptions {
   out?: string;
   verbose?: boolean;
+  silent?: boolean;
 }
 
 export interface BuildOptions {
