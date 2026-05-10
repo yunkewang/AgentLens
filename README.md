@@ -1,5 +1,8 @@
 # AgentLens
 
+[![CI](https://github.com/yunkewang/AgentLens/actions/workflows/ci.yml/badge.svg)](https://github.com/yunkewang/AgentLens/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **See how AI agents see your repo.**
 
 AgentLens is a local-first CLI that scans your repository's agent instruction layer and generates an interactive, self-contained HTML report.
@@ -7,6 +10,18 @@ AgentLens is a local-first CLI that scans your repository's agent instruction la
 It discovers, parses, visualizes, and reviews files such as AGENTS.md, CLAUDE.md, GEMINI.md, AI coding rules, skill folders, command files, prompt files, and MCP configs.
 
 No backend. No account. No source upload. The report works offline as a portable HTML artifact.
+
+---
+
+## Why this matters
+
+AI agents do not only read your code. They also read the instruction layer around your code: AGENTS.md, CLAUDE.md, Cursor rules, Claude commands, skills, prompts, and MCP configs. That layer can grant broad permissions, expose internal context, define unsafe commands, or quietly change how agents behave. AgentLens makes that layer visible.
+
+For a deeper read, see:
+
+- [Threat model](docs/threat-model.md) — what the instruction layer is, what's at risk, what AgentLens does and doesn't detect.
+- [Security rules](docs/rules.md) — every finding category, with examples and remediation.
+- [GitHub Actions usage](docs/github-actions.md) — running AgentLens in CI and uploading the report as an artifact.
 
 ---
 
