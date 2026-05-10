@@ -99,7 +99,7 @@ The generated report includes the following sections:
 
 ## Example Report
 
-AgentLens generates a local interactive HTML report with readiness scoring, risk posture, artifact inventory, findings, and remediation guidance.
+AgentLens generates a local interactive HTML report with readiness scoring, risk posture, artifact inventory, findings, and remediation guidance. Each finding includes CWE and OWASP LLM Top 10 references.
 
 ![AgentLens overview report](docs/images/agentlens-overview-current.png)
 
