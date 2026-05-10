@@ -5,6 +5,7 @@ import { scanRepo } from '../core/scanner';
 import { applyRisks } from '../core/riskScanner';
 import { buildManifest } from '../core/manifest';
 import { scanProjectDocs } from '../core/projectDocScanner';
+import { loadConfig } from '../core/config';
 import { writeJson } from '../utils/file';
 import { logger } from '../utils/logger';
 import { isGitHubUrl, repoNameFromPath, repoNameFromUrl, resolveOutputDir } from '../utils/paths';
@@ -37,6 +38,8 @@ export async function runScan(
 
   logger.info(`\nScanning ${repoSource} ...`);
 
+  const config = await loadConfig(repoPath);
+
   const rawFiles = await scanRepo(repoPath);
   const files = applyRisks(rawFiles);
 
@@ -53,12 +56,15 @@ export async function runScan(
     extraWarnings: projectDocs?.warnings ?? [],
     projectDocs: projectDocs?.docs,
     projectDocsInfo: projectDocs?.info,
+    config,
   });
 
   const manifestPath = path.join(outputDir, 'manifest.json');
   await writeJson(manifestPath, manifest);
 
-  if (!options.silent) {
+  if (options.json) {
+    process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
+  } else if (!options.silent) {
     printScanSummary(manifest, manifestPath);
   }
 

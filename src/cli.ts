@@ -16,6 +16,7 @@ type DocOpts = {
   includeDocs?: boolean;
   maxDocs?: number;
   maxFileSize?: number;
+  json?: boolean;
 };
 
 function parsePositiveInt(label: string) {
@@ -33,6 +34,7 @@ program
   .description('Scan a local repo or public GitHub URL and generate manifest.json')
   .option('-o, --out <path>', 'Output directory (default: ./output/<repo-name>)')
   .option('-v, --verbose', 'Verbose output')
+  .option('--json', 'Output manifest JSON to stdout (for CI pipelines)')
   .option('--include-docs', 'Also include README and Markdown project documentation')
   .option('--max-docs <number>', 'Maximum number of project docs to include (default: 100)', parsePositiveInt('--max-docs'))
   .option('--max-file-size <bytes>', 'Skip project doc files larger than this many bytes (default: 1048576)', parsePositiveInt('--max-file-size'))
@@ -51,6 +53,7 @@ program
   .description('Scan and generate manifest.json + report.html')
   .option('-o, --out <path>', 'Output directory (default: ./output/<repo-name>)')
   .option('-v, --verbose', 'Verbose output')
+  .option('--json', 'Output manifest JSON to stdout (for CI pipelines)')
   .option('--include-docs', 'Also include README and Markdown project documentation')
   .option('--max-docs <number>', 'Maximum number of project docs to include (default: 100)', parsePositiveInt('--max-docs'))
   .option('--max-file-size <bytes>', 'Skip project doc files larger than this many bytes (default: 1048576)', parsePositiveInt('--max-file-size'))

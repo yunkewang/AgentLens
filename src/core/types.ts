@@ -13,6 +13,8 @@ export type FileSubtype =
   | 'copilot_instructions'
   | 'cursor_mdc'
   | 'cursorrules'
+  | 'windsurfrules'
+  | 'windsurf_md'
   | 'claude_skill'
   | 'mcp_json'
   | 'prompt_md'
@@ -46,6 +48,7 @@ export interface SecurityFinding {
   message: string;
   path: string;
   evidence?: string;
+  lineNumber?: number;
   recommendation?: string;
   source?: FindingSource;
 }
@@ -126,6 +129,7 @@ export interface ScanOptions {
   out?: string;
   verbose?: boolean;
   silent?: boolean;
+  json?: boolean;
   includeDocs?: boolean;
   maxDocs?: number;
   maxFileSize?: number;
@@ -134,6 +138,7 @@ export interface ScanOptions {
 export interface BuildOptions {
   out?: string;
   verbose?: boolean;
+  json?: boolean;
   includeDocs?: boolean;
   maxDocs?: number;
   maxFileSize?: number;

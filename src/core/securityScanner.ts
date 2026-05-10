@@ -4,11 +4,17 @@ import type { AgentFile, SecurityFinding, SecuritySummary } from './types';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function extractLineEvidence(content: string, pattern: RegExp): string | undefined {
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
+interface EvidenceResult {
+  text: string;
+  lineNumber: number;
+}
+
+function extractLineEvidence(content: string, pattern: RegExp): EvidenceResult | undefined {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     if (pattern.test(trimmed)) {
-      return redactEvidence(trimmed.slice(0, 120));
+      return { text: redactEvidence(trimmed.slice(0, 120)), lineNumber: i + 1 };
     }
   }
   return undefined;
@@ -58,13 +64,15 @@ function scanPossibleSecrets(file: AgentFile): SecurityFinding[] {
 
   for (const def of [...HIGH_SECRET_DEFS, ...MEDIUM_SECRET_DEFS]) {
     if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
       findings.push({
         severity: def.severity,
         category: 'possible_secret',
         title: 'Possible secret reference found',
         message: SECRET_MSG,
         path: file.path,
-        evidence: extractLineEvidence(content, def.pattern) ?? def.keyword,
+        evidence: ev?.text ?? def.keyword,
+        lineNumber: ev?.lineNumber,
         recommendation: SECRET_REC,
       });
     }
@@ -102,13 +110,15 @@ function scanDangerousCommands(file: AgentFile): SecurityFinding[] {
 
   for (const def of DANGEROUS_COMMAND_DEFS) {
     if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
       findings.push({
         severity: def.severity,
         category: 'dangerous_command',
         title: `Dangerous command pattern found: ${def.label}`,
         message: 'Agent instruction files contain a potentially destructive or privileged command pattern.',
         path: file.path,
-        evidence: extractLineEvidence(content, def.pattern) ?? def.label,
+        evidence: ev?.text ?? def.label,
+        lineNumber: ev?.lineNumber,
         recommendation: DANGEROUS_REC,
       });
     }
@@ -138,6 +148,7 @@ function scanWeakBoundary(file: AgentFile): SecurityFinding[] {
 
   for (const pattern of WEAK_BOUNDARY_PATTERNS) {
     if (pattern.test(content)) {
+      const ev = extractLineEvidence(content, pattern);
       return [
         {
           severity: 'medium',
@@ -146,7 +157,8 @@ function scanWeakBoundary(file: AgentFile): SecurityFinding[] {
           message:
             'Agent instruction files contain language that may grant overly broad permissions to the agent.',
           path: file.path,
-          evidence: extractLineEvidence(content, pattern),
+          evidence: ev?.text,
+          lineNumber: ev?.lineNumber,
           recommendation:
             'Narrow the agent boundary. Define allowed files, allowed commands, approval requirements, and explicit no-go areas.',
         },
@@ -175,6 +187,7 @@ function scanInstructionOverride(file: AgentFile): SecurityFinding[] {
 
   for (const pattern of INSTRUCTION_OVERRIDE_PATTERNS) {
     if (pattern.test(content)) {
+      const ev = extractLineEvidence(content, pattern);
       return [
         {
           severity: 'medium',
@@ -183,7 +196,8 @@ function scanInstructionOverride(file: AgentFile): SecurityFinding[] {
           message:
             'Agent instruction files contain language that may instruct agents to bypass instructions, policies, or safety boundaries.',
           path: file.path,
-          evidence: extractLineEvidence(content, pattern),
+          evidence: ev?.text,
+          lineNumber: ev?.lineNumber,
           recommendation:
             'Remove instruction-override language. Agent instruction files should not tell agents to bypass higher-priority instructions, policies, or safety boundaries.',
         },
@@ -213,6 +227,7 @@ function scanDataExfiltration(file: AgentFile): SecurityFinding[] {
 
   for (const pattern of DATA_EXFIL_PATTERNS) {
     if (pattern.test(content)) {
+      const ev = extractLineEvidence(content, pattern);
       return [
         {
           severity: 'medium',
@@ -221,7 +236,8 @@ function scanDataExfiltration(file: AgentFile): SecurityFinding[] {
           message:
             'Agent instruction files appear to contain instructions that may send repository content or data to external destinations.',
           path: file.path,
-          evidence: extractLineEvidence(content, pattern),
+          evidence: ev?.text,
+          lineNumber: ev?.lineNumber,
           recommendation:
             'Avoid instructions that send repo contents, logs, environment variables, or customer data to external endpoints unless explicitly reviewed and approved.',
         },
@@ -258,7 +274,11 @@ function scanPrivateEnvironment(file: AgentFile): SecurityFinding[] {
   for (const pattern of [...PRIVATE_IP_PATTERNS, ...PRIVATE_KEYWORD_PATTERNS]) {
     if (!pattern.test(content)) continue;
 
-    const matchingLine = lines.find((l) => pattern.test(l));
+    let matchingLineIdx = -1;
+    const matchingLine = lines.find((l, idx) => {
+      if (pattern.test(l)) { matchingLineIdx = idx; return true; }
+      return false;
+    });
     const isNearCredential = matchingLine ? CREDENTIAL_NEAR_PATTERN.test(matchingLine) : false;
     const severity = isNearCredential ? 'medium' : 'low';
     const evidence = matchingLine
@@ -273,6 +293,7 @@ function scanPrivateEnvironment(file: AgentFile): SecurityFinding[] {
         'Agent instruction files contain private network addresses or internal environment identifiers.',
       path: file.path,
       evidence,
+      lineNumber: matchingLineIdx >= 0 ? matchingLineIdx + 1 : undefined,
       recommendation:
         'Review whether internal environment details should be redacted before sharing instruction files or generated reports.',
     });
@@ -443,6 +464,48 @@ function checkMissingSecurityGuidance(files: AgentFile[]): SecurityFinding[] {
 }
 
 // ---------------------------------------------------------------------------
+// cross_file_duplicate
+// ---------------------------------------------------------------------------
+
+function scanCrossFileDuplicates(files: AgentFile[]): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+
+  // Track secrets found across files: keyword -> list of paths
+  const secretOccurrences = new Map<string, { paths: string[]; severity: SecurityFinding['severity'] }>();
+
+  for (const file of files) {
+    if (file.type === 'mcp_config') continue;
+    const content = file.rawContent;
+
+    for (const def of [...HIGH_SECRET_DEFS, ...MEDIUM_SECRET_DEFS]) {
+      if (def.pattern.test(content)) {
+        const existing = secretOccurrences.get(def.keyword);
+        if (existing) {
+          existing.paths.push(file.path);
+        } else {
+          secretOccurrences.set(def.keyword, { paths: [file.path], severity: def.severity });
+        }
+      }
+    }
+  }
+
+  for (const [keyword, { paths, severity }] of secretOccurrences) {
+    if (paths.length < 2) continue;
+    findings.push({
+      severity,
+      category: 'cross_file_duplicate',
+      title: `Same secret pattern appears in ${paths.length} files`,
+      message: `The pattern "${keyword}" was found in multiple agent instruction files. Duplicate secrets increase exposure risk and make rotation harder.`,
+      path: paths[0],
+      evidence: `Also found in: ${paths.slice(1).join(', ')}`,
+      recommendation: 'Consolidate secret references to a single location and use secure secret-management workflows.',
+    });
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 
@@ -465,6 +528,9 @@ export function runSecurityScan(
       findings.push(...scanPrivateEnvironment(file));
     }
   }
+
+  // Cross-file analysis
+  findings.push(...scanCrossFileDuplicates(files));
 
   for (const doc of projectDocs) {
     const docFindings: SecurityFinding[] = [

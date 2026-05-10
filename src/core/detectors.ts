@@ -39,6 +39,16 @@ export const DETECTION_PATTERNS: DetectionPattern[] = [
     patterns: ['.cursorrules'],
   },
   {
+    type: 'rule',
+    subtype: 'windsurfrules',
+    patterns: ['.windsurfrules'],
+  },
+  {
+    type: 'rule',
+    subtype: 'windsurf_md',
+    patterns: ['.windsurf/rules/*.md', '.windsurf/rules/**/*.md'],
+  },
+  {
     type: 'mcp_config',
     subtype: 'mcp_json',
     patterns: ['.mcp.json', 'mcp.json', '.cursor/mcp.json'],

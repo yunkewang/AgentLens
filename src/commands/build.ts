@@ -15,7 +15,11 @@ export async function runBuild(
 
   await generateHtmlReport(manifest, reportPath);
 
-  printScanSummary(manifest, manifestPath, { mode: 'build', reportPath });
+  if (options.json) {
+    process.stdout.write(JSON.stringify(manifest, null, 2) + '\n');
+  } else {
+    printScanSummary(manifest, manifestPath, { mode: 'build', reportPath });
+  }
 
   if (tempDir) {
     await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);

@@ -677,7 +677,7 @@ ${groups.map(([label, severity, findings]) => findings.length === 0 ? '' : `
     <span style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:0.5px;">${esc(f.category.replace(/_/g, ' '))}</span>
   </div>
   <div class="finding-title">${esc(f.title)}</div>
-  <div class="finding-path"><code>${esc(f.path)}</code></div>
+  <div class="finding-path"><code>${esc(f.path)}${f.lineNumber ? `:${f.lineNumber}` : ''}</code></div>
   <div class="finding-message">${esc(f.message)}</div>
   ${f.evidence ? `<div class="finding-evidence"><strong>Evidence:</strong> <code>${esc(f.evidence)}</code></div>` : ''}
   ${f.recommendation ? `<div class="finding-rec"><strong>Recommendation:</strong> ${esc(f.recommendation)}</div>` : ''}
