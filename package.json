@@ -25,7 +25,7 @@
     "security",
     "static-analysis"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "AgentLens contributors",
   "homepage": "https://github.com/yunkewang/AgentLens#readme",
   "repository": {
