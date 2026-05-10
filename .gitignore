@@ -3,6 +3,7 @@ node_modules/
 dist/
 .agentlens/
 output/
+.claude/
 exports/
 agentlens-report*/
 *.tsbuildinfo
