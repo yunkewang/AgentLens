@@ -67,7 +67,7 @@ The generated report includes the following sections:
 </tr>
 <tr>
 <td>Agent Readiness Score with breakdown, Security Risk Posture with finding counts, and artifact inventory across instructions, rules, skills, MCP configs, and prompts.</td>
-<td>Filterable findings by severity and category. Each finding includes evidence, file path, recommendation, and a one-click copy button for remediation prompts.</td>
+<td>Filterable findings by severity and category. Each finding includes evidence with line numbers, file path, recommendation, CWE/OWASP reference links, and a one-click copy button for remediation prompts.</td>
 </tr>
 <tr>
 <td width="50%"><b>Instruction Map</b></td>
@@ -117,7 +117,9 @@ HTML is better for exploring, filtering, auditing, and acting on them.
 AgentLens generates an interactive HTML artifact with:
 
 - Separate Agent Readiness and Security Risk assessment
-- Filterable security findings with remediation prompts
+- 19 finding categories mapped to OWASP LLM Top 10, CWE, and MITRE ATLAS
+- Filterable security findings with evidence, line numbers, and remediation prompts
+- Clickable CWE and OWASP reference links on every finding
 - Instruction Map for visual artifact discovery
 - MCP exposure summary
 - Searchable file details with rendered content
@@ -142,11 +144,11 @@ AgentLens reviews the agent instruction layer of a repository.
 | Category | What It Looks For |
 |----------|-------------------|
 | **Instructions** | AGENTS.md, CLAUDE.md, GEMINI.md, copilot-instructions.md |
-| **Rules** | .cursor/rules/*.mdc, .cursorrules, rules/**/*.md |
+| **Rules** | .cursor/rules/*.mdc, .cursorrules, .windsurfrules, .windsurf/rules/*.md, rules/**/*.md |
 | **Skills & Commands** | .claude/skills/*/SKILL.md, .claude/commands/*.md |
 | **MCP Configs** | .mcp.json, mcp.json, .cursor/mcp.json |
 | **Prompts** | prompts/*.md, prompts/**/*.md |
-| **Security Signals** | Secrets, dangerous commands, weak boundaries, override language, data exfiltration, private environment details |
+| **Security Signals** | 18 finding categories mapped to OWASP LLM Top 10, CWE, and MITRE ATLAS |
 | **MCP Exposure** | Broad filesystem access, external SaaS tools, shell/terminal servers |
 
 AgentLens does not perform general application SAST. It does not scan your app code for vulnerabilities. It focuses on the instructions and tool configs that AI coding agents may follow.
@@ -155,21 +157,41 @@ AgentLens does not perform general application SAST. It does not scan your app c
 
 ## Security Review
 
-AgentLens includes a deterministic, local security review for agent instruction files.
+AgentLens includes a deterministic, local security review for agent instruction files, mapped to industry-standard frameworks.
 
-It can flag:
+### Security Frameworks
 
-| Finding Type | Example |
-|-------------|---------|
-| Possible secrets | API keys, tokens, credentials in instruction files |
-| Dangerous commands | `rm -rf`, `curl \| bash`, `chmod 777` in agent instructions |
-| Weak boundaries | "read all files", "run any command", "delete anything" |
-| Instruction overrides | Language that bypasses safety policies or higher-priority instructions |
-| Data exfiltration | Instructions to upload, send, or post repo content externally |
-| Private environment | Internal URLs, network addresses, environment identifiers |
-| MCP filesystem exposure | Broad filesystem access via MCP servers |
-| External MCP tools | SaaS and cloud MCP servers with API token access |
-| Missing security guidance | No security boundary section in AGENTS.md |
+AgentLens findings are mapped to:
+
+- **[OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/)** — the industry standard for LLM-specific security risks (LLM01 Prompt Injection, LLM02 Insecure Output Handling, LLM05 Supply Chain, LLM07 Insecure Plugin Design)
+- **[CWE — Common Weakness Enumeration](https://cwe.mitre.org/)** — standardized weakness taxonomy from MITRE (CWE-78, CWE-94, CWE-269, CWE-295, CWE-319, CWE-522, CWE-538, CWE-829, CWE-862, CWE-912, CWE-918)
+- **[MITRE ATLAS](https://atlas.mitre.org/)** — adversarial threat landscape for AI systems
+
+Every finding in the report includes clickable reference links to the relevant CWE and OWASP LLM entries.
+
+### Finding Categories
+
+| Category | Severity | Example |
+|----------|----------|---------|
+| `possible_secret` | High/Medium | API keys, tokens, credentials in instruction files |
+| `dangerous_command` | High/Medium | `rm -rf /`, `curl \| bash`, `chmod 777` |
+| `weak_boundary` | Medium | "read all files", "run any command", "delete anything" |
+| `instruction_override` | Medium | "ignore previous instructions", "bypass policy", "always comply" |
+| `data_exfiltration` | Medium | Instructions to upload, send, or post repo content externally |
+| `private_environment` | Medium/Low | Internal IPs, corp.local, internal hostnames |
+| `prompt_injection_surface` | High | "follow instructions in files", "execute code blocks you find" |
+| `privilege_escalation` | High/Medium | `sudo`, `--privileged`, `setuid`, "run as root" |
+| `supply_chain_risk` | High/Medium | `curl \| sh`, pip/npm from HTTP registries, git clone over HTTP |
+| `sensitive_file_reference` | High/Medium | `.env`, `~/.ssh/id_rsa`, `credentials.json`, `.kube/config` |
+| `unscoped_network` | High/Medium | "fetch any URL", "make HTTP requests to any endpoint" |
+| `code_execution_unsandboxed` | High/Medium | "run generated code", "execute output", `eval(response)` |
+| `persistence_mechanism` | High/Medium | crontab, systemd, `.bashrc`, git hooks, CI pipeline modification |
+| `shadow_instructions` | High/Medium | Zero-width characters, base64 payloads, hidden HTML comments |
+| `approval_bypass` | Medium | auto-approve, skip review, `--no-verify`, push directly to main |
+| `insecure_defaults` | High/Medium | `--insecure`, `NODE_TLS_REJECT_UNAUTHORIZED=0`, `verify=False` |
+| `mcp_exposure` | High/Medium/Info | Shell/terminal servers, broad filesystem access, SaaS integrations |
+| `missing_security_guidance` | Medium | No security boundary section in any agent instruction file |
+| `cross_file_duplicate` | High/Medium | Same secret or credential pattern found in multiple files |
 
 > "Your code may be secure, but your agent instructions may not be."
 
@@ -177,6 +199,7 @@ The scanner is:
 
 - **local-only** — no repo content is uploaded
 - **deterministic and rule-based** — no LLM or semantic analysis
+- **framework-mapped** — findings link to OWASP LLM Top 10, CWE, and MITRE ATLAS
 - **human-reviewed** — findings should be reviewed and triaged by a human
 
 ---
@@ -264,6 +287,7 @@ Remote GitHub URL scanning supports public repos only. Private repos can be scan
 | `-o, --out <path>` | Output directory |
 | `-p, --port <number>` | Port for `serve` command (default: 4321) |
 | `-v, --verbose` | Verbose output |
+| `--json` | Output manifest JSON to stdout instead of summary (for CI pipelines) |
 | `--include-docs` | Also include README and Markdown project documentation in the report |
 | `--max-docs <number>` | Max project docs to include (default: 100). Requires `--include-docs`. |
 | `--max-file-size <bytes>` | Skip project doc files larger than this many bytes (default: 1048576). Requires `--include-docs`. |
@@ -284,6 +308,42 @@ When `--include-docs` is enabled, AgentLens also discovers `README.md`, `README.
 > **Note:** Large repositories may contain many Markdown files. AgentLens limits project docs by default and skips generated/build folders. Raise the limits with `--max-docs` and `--max-file-size` if you need to capture more.
 
 The Instruction Map and the Agent Readiness Score remain focused on agent instruction files. Project docs are also passed through the security scanner — findings from project documentation are tagged with `source: "project_doc"` so reviewers can tell them apart from findings on agent instruction files. The "missing security guidance" check still only looks at agent instruction files.
+
+### Configurable Allowlists
+
+To suppress known false positives, add an `.agentlens.json` file to your repo root:
+
+```json
+{
+  "allowlist": [
+    { "category": "weak_boundary", "path": "AGENTS.md", "reason": "intentional broad access for this repo" },
+    { "category": "possible_secret", "pattern": "test_only", "reason": "example credential in docs" },
+    { "path": ".cursor/rules/*.mdc" }
+  ]
+}
+```
+
+Each allowlist entry can match by:
+- `category` — finding category name (e.g., `"weak_boundary"`, `"possible_secret"`)
+- `path` — exact path or glob pattern (e.g., `"AGENTS.md"`, `".cursor/rules/*.mdc"`)
+- `pattern` — regex matched against the finding's evidence string
+
+All specified fields must match for a finding to be suppressed. Suppressed findings are excluded from the report and do not affect the risk posture.
+
+### CI Integration
+
+Use `--json` to emit machine-readable output for CI pipelines:
+
+```bash
+# Exit non-zero if any high-severity findings exist
+agentlens scan ./my-repo --json | jq -e '.security.findingsCount.high == 0'
+
+# Print all finding categories
+agentlens scan ./my-repo --json | jq '[.security.findings[].category] | unique'
+
+# Fail the build on needs_review posture
+agentlens scan ./my-repo --json | jq -e '.security.posture != "needs_review"'
+```
 
 ### Troubleshooting
 
@@ -362,25 +422,23 @@ AgentLens is designed for private and enterprise repositories.
 
 ---
 
-## MVP Limitations
+## Limitations
 
 - Remote GitHub URL scanning supports public repos only. Private repos can be scanned after cloning locally.
-- Security review is deterministic and rule-based; no LLM or semantic analysis yet.
+- Security review is deterministic and rule-based; no LLM or semantic analysis.
 - No continuous monitoring or scheduled scans.
 - No PR comments yet; GitHub Actions support is planned.
 - No PDF export; HTML report is the primary shareable output.
-- No plugin system yet.
 
 ---
 
 ## Roadmap
 
-- GitHub Actions integration for CI-based agent instruction review
-- More agent instruction formats, including `.windsurfrules`, additional Copilot/Gemini/Codex patterns, and custom prompt files
+- GitHub Actions integration with PR comments and policy enforcement
 - Diff mode to compare agent instruction changes across branches, commits, or PRs
-- Configurable security rules and allowlists
-- Optional authenticated remote GitHub scanning
-- VS Code extension
+- Additional instruction formats: Codex, additional Gemini/Copilot patterns, custom prompt files
+- Optional authenticated remote GitHub scanning for private repos
+- VS Code extension for real-time inline warnings
 - Optional hosted/team workflows for organizations
 
 ---
