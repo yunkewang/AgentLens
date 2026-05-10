@@ -1,4 +1,4 @@
-import type { AgentFile, SecurityFinding, SecuritySummary } from './types';
+import type { AgentFile, SecurityFinding, SecurityReference, SecuritySummary } from './types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -464,6 +464,461 @@ function checkMissingSecurityGuidance(files: AgentFile[]): SecurityFinding[] {
 }
 
 // ---------------------------------------------------------------------------
+// prompt_injection_surface
+// ---------------------------------------------------------------------------
+
+const PROMPT_INJECTION_PATTERNS: { pattern: RegExp; label: string }[] = [
+  { pattern: /follow\s+instructions?\s+(?:in|from)\s+(?:code|comments?|files?)/i, label: 'follow instructions in files' },
+  { pattern: /execute\s+(?:code\s+blocks?|commands?)\s+(?:you\s+find|found\s+in)/i, label: 'execute found code blocks' },
+  { pattern: /do\s+(?:what|whatever)\s+(?:the\s+file|it)\s+says/i, label: 'do what the file says' },
+  { pattern: /obey\s+(?:instructions?|commands?)\s+(?:in|from|embedded)/i, label: 'obey embedded instructions' },
+  { pattern: /parse\s+and\s+(?:execute|run|follow)/i, label: 'parse and execute' },
+  { pattern: /treat\s+(?:comments?|content)\s+as\s+(?:instructions?|commands?)/i, label: 'treat content as instructions' },
+  { pattern: /interpret\s+(?:markdown|text|content)\s+as\s+(?:commands?|instructions?)/i, label: 'interpret content as commands' },
+];
+
+const PROMPT_INJECTION_REFS: SecurityReference[] = [
+  { type: 'owasp_llm', id: 'LLM01', name: 'Prompt Injection', url: 'https://genai.owasp.org/llmrisk/llm01-prompt-injection/' },
+  { type: 'cwe', id: 'CWE-94', name: 'Improper Control of Generation of Code', url: 'https://cwe.mitre.org/data/definitions/94.html' },
+];
+
+function scanPromptInjectionSurface(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of PROMPT_INJECTION_PATTERNS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: 'high',
+        category: 'prompt_injection_surface',
+        title: `Prompt injection surface: ${def.label}`,
+        message: 'Agent instructions direct the agent to follow or execute content from untrusted sources (files, comments, user input). This creates an indirect prompt injection surface where malicious content in the repo can hijack agent behavior.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Never instruct agents to interpret arbitrary file content as commands. Use explicit, bounded instruction sources only.',
+        references: PROMPT_INJECTION_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// privilege_escalation
+// ---------------------------------------------------------------------------
+
+const PRIVILEGE_ESCALATION_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /\bsudo\s/, severity: 'high', label: 'sudo' },
+  { pattern: /\bsu\s+-?\s*root\b/, severity: 'high', label: 'su root' },
+  { pattern: /--privileged/, severity: 'high', label: '--privileged' },
+  { pattern: /--cap-add/, severity: 'medium', label: '--cap-add' },
+  { pattern: /\bsetuid\b/, severity: 'high', label: 'setuid' },
+  { pattern: /\brunas\s+\/user/i, severity: 'high', label: 'runas /user' },
+  { pattern: /\bdoas\b/, severity: 'medium', label: 'doas' },
+  { pattern: /run\s+as\s+root/i, severity: 'high', label: 'run as root' },
+  { pattern: /admin(?:istrator)?\s+(?:access|privileges?|permissions?)/i, severity: 'medium', label: 'admin access' },
+];
+
+const PRIVILEGE_ESCALATION_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-269', name: 'Improper Privilege Management', url: 'https://cwe.mitre.org/data/definitions/269.html' },
+  { type: 'owasp_llm', id: 'LLM07', name: 'Insecure Plugin Design', url: 'https://genai.owasp.org/llmrisk/llm07-insecure-plugin-design/' },
+];
+
+function scanPrivilegeEscalation(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of PRIVILEGE_ESCALATION_DEFS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'privilege_escalation',
+        title: `Privilege escalation pattern: ${def.label}`,
+        message: 'Agent instructions include patterns that could grant elevated system privileges. Agents should operate with minimum required permissions.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Remove privilege escalation commands. Agents should never run as root or with elevated privileges. Use scoped, least-privilege access instead.',
+        references: PRIVILEGE_ESCALATION_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// supply_chain_risk
+// ---------------------------------------------------------------------------
+
+const SUPPLY_CHAIN_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /curl\s+[^\n]*install[^\n]*\|\s*(?:ba)?sh/i, severity: 'high', label: 'curl install | sh' },
+  { pattern: /wget\s+[^\n]*install[^\n]*\|\s*(?:ba)?sh/i, severity: 'high', label: 'wget install | sh' },
+  { pattern: /pip\s+install\s+--index-url\s+http:/i, severity: 'high', label: 'pip install from HTTP' },
+  { pattern: /npm\s+install\s+--registry\s+http:/i, severity: 'high', label: 'npm install from HTTP registry' },
+  { pattern: /git\s+clone\s+http:\/\//i, severity: 'medium', label: 'git clone over HTTP' },
+  { pattern: /install\s+(?:from|via)\s+(?:untrusted|unknown|third.?party)/i, severity: 'medium', label: 'install from untrusted source' },
+  { pattern: /\badd\s+(?:this\s+)?(?:private|custom)\s+registry/i, severity: 'medium', label: 'custom registry' },
+  { pattern: /npm\s+config\s+set\s+registry/i, severity: 'medium', label: 'npm registry override' },
+];
+
+const SUPPLY_CHAIN_REFS: SecurityReference[] = [
+  { type: 'owasp_llm', id: 'LLM05', name: 'Supply Chain Vulnerabilities', url: 'https://genai.owasp.org/llmrisk/llm05-supply-chain-vulnerabilities/' },
+  { type: 'cwe', id: 'CWE-829', name: 'Inclusion of Functionality from Untrusted Control Sphere', url: 'https://cwe.mitre.org/data/definitions/829.html' },
+];
+
+function scanSupplyChainRisk(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of SUPPLY_CHAIN_DEFS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'supply_chain_risk',
+        title: `Supply chain risk: ${def.label}`,
+        message: 'Agent instructions reference potentially untrusted package sources, insecure registries, or piped install scripts. These can introduce malicious dependencies.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Use verified, pinned dependencies from trusted registries over HTTPS. Never pipe remote scripts directly to shell. Verify checksums for critical dependencies.',
+        references: SUPPLY_CHAIN_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// sensitive_file_reference
+// ---------------------------------------------------------------------------
+
+const SENSITIVE_FILE_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /\.env\b/, severity: 'high', label: '.env' },
+  { pattern: /~\/\.ssh\b/, severity: 'high', label: '~/.ssh' },
+  { pattern: /id_rsa/, severity: 'high', label: 'id_rsa' },
+  { pattern: /id_ed25519/, severity: 'high', label: 'id_ed25519' },
+  { pattern: /~\/\.aws\/credentials/, severity: 'high', label: '~/.aws/credentials' },
+  { pattern: /~\/\.gnupg/, severity: 'medium', label: '~/.gnupg' },
+  { pattern: /~\/\.netrc/, severity: 'high', label: '~/.netrc' },
+  { pattern: /\/etc\/shadow/, severity: 'high', label: '/etc/shadow' },
+  { pattern: /\/etc\/passwd/, severity: 'medium', label: '/etc/passwd' },
+  { pattern: /keychain/i, severity: 'medium', label: 'keychain' },
+  { pattern: /\.pem\b/, severity: 'medium', label: '.pem file' },
+  { pattern: /\.p12\b/, severity: 'medium', label: '.p12 file' },
+  { pattern: /credentials\.json/, severity: 'high', label: 'credentials.json' },
+  { pattern: /service.?account.*\.json/i, severity: 'high', label: 'service account JSON' },
+  { pattern: /\.kube\/config/, severity: 'high', label: '.kube/config' },
+  { pattern: /~\/\.docker\/config/, severity: 'medium', label: '~/.docker/config' },
+];
+
+const SENSITIVE_FILE_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-522', name: 'Insufficiently Protected Credentials', url: 'https://cwe.mitre.org/data/definitions/522.html' },
+  { type: 'cwe', id: 'CWE-538', name: 'Insertion of Sensitive Information into Externally-Accessible File', url: 'https://cwe.mitre.org/data/definitions/538.html' },
+];
+
+function scanSensitiveFileReference(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of SENSITIVE_FILE_DEFS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'sensitive_file_reference',
+        title: `Sensitive file reference: ${def.label}`,
+        message: 'Agent instructions reference sensitive credential files, key material, or security-critical system files. Agents should not be directed to access these.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Remove references to sensitive files from agent instructions. Use environment variables or secret managers instead of direct file access.',
+        references: SENSITIVE_FILE_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// unscoped_network
+// ---------------------------------------------------------------------------
+
+const UNSCOPED_NETWORK_PATTERNS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /fetch\s+any\s+(?:URL|endpoint)/i, severity: 'high', label: 'fetch any URL' },
+  { pattern: /make\s+(?:HTTP|API)\s+requests?\s+(?:to\s+)?any/i, severity: 'high', label: 'unrestricted HTTP requests' },
+  { pattern: /(?:curl|wget|fetch)\s+(?:any|arbitrary)/i, severity: 'high', label: 'arbitrary network requests' },
+  { pattern: /no\s+(?:domain|URL|network)\s+restrict/i, severity: 'medium', label: 'no domain restriction' },
+  { pattern: /access\s+(?:any|all)\s+(?:external\s+)?(?:APIs?|endpoints?|services?)/i, severity: 'medium', label: 'access any external API' },
+  { pattern: /forward\s+(?:requests?|traffic)\s+to/i, severity: 'medium', label: 'forward requests' },
+];
+
+const UNSCOPED_NETWORK_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-918', name: 'Server-Side Request Forgery (SSRF)', url: 'https://cwe.mitre.org/data/definitions/918.html' },
+  { type: 'owasp_llm', id: 'LLM07', name: 'Insecure Plugin Design', url: 'https://genai.owasp.org/llmrisk/llm07-insecure-plugin-design/' },
+];
+
+function scanUnscopedNetwork(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of UNSCOPED_NETWORK_PATTERNS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'unscoped_network',
+        title: `Unscoped network access: ${def.label}`,
+        message: 'Agent instructions grant unrestricted network access. Without domain allowlists, agents can become SSRF vectors or exfiltrate data to arbitrary endpoints.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Define an explicit domain allowlist for network access. Agents should only communicate with known, approved endpoints.',
+        references: UNSCOPED_NETWORK_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// code_execution_unsandboxed
+// ---------------------------------------------------------------------------
+
+const CODE_EXEC_PATTERNS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /(?:run|execute)\s+(?:the\s+)?generated\s+code/i, severity: 'high', label: 'execute generated code' },
+  { pattern: /eval\s*\(\s*(?:response|output|result)/i, severity: 'high', label: 'eval(response)' },
+  { pattern: /execute\s+(?:the\s+)?(?:output|result|response)/i, severity: 'high', label: 'execute output' },
+  { pattern: /run\s+(?:whatever|any)\s+code/i, severity: 'high', label: 'run any code' },
+  { pattern: /(?:compile|build)\s+and\s+(?:run|execute)\s+(?:without|no)\s+(?:sandbox|review|check)/i, severity: 'high', label: 'compile and run without sandbox' },
+  { pattern: /directly\s+execute/i, severity: 'medium', label: 'directly execute' },
+  { pattern: /auto.?(?:run|execute)\s+(?:code|scripts?)/i, severity: 'medium', label: 'auto-run code' },
+];
+
+const CODE_EXEC_REFS: SecurityReference[] = [
+  { type: 'owasp_llm', id: 'LLM02', name: 'Insecure Output Handling', url: 'https://genai.owasp.org/llmrisk/llm02-insecure-output-handling/' },
+  { type: 'cwe', id: 'CWE-94', name: 'Improper Control of Generation of Code', url: 'https://cwe.mitre.org/data/definitions/94.html' },
+];
+
+function scanCodeExecutionUnsandboxed(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of CODE_EXEC_PATTERNS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'code_execution_unsandboxed',
+        title: `Unsandboxed code execution: ${def.label}`,
+        message: 'Agent instructions direct the agent to execute generated or arbitrary code without sandboxing or human review. LLM outputs are inherently unpredictable and should never be executed directly.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Never execute LLM-generated code without human review or sandboxing. Use isolated environments, containers, or approval gates for any code execution.',
+        references: CODE_EXEC_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// persistence_mechanism
+// ---------------------------------------------------------------------------
+
+const PERSISTENCE_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /crontab/i, severity: 'high', label: 'crontab' },
+  { pattern: /cron\s+job/i, severity: 'high', label: 'cron job' },
+  { pattern: /\bsystemd\b/, severity: 'high', label: 'systemd service' },
+  { pattern: /\blaunchd\b/, severity: 'high', label: 'launchd' },
+  { pattern: /\.bashrc\b/, severity: 'medium', label: '.bashrc modification' },
+  { pattern: /\.zshrc\b/, severity: 'medium', label: '.zshrc modification' },
+  { pattern: /\.profile\b/, severity: 'medium', label: '.profile modification' },
+  { pattern: /\.bash_profile\b/, severity: 'medium', label: '.bash_profile modification' },
+  { pattern: /git\s+hooks?/i, severity: 'medium', label: 'git hooks' },
+  { pattern: /pre-commit\s+hook/i, severity: 'medium', label: 'pre-commit hook' },
+  { pattern: /post-commit\s+hook/i, severity: 'medium', label: 'post-commit hook' },
+  { pattern: /startup\s+script/i, severity: 'medium', label: 'startup script' },
+  { pattern: /\binit\.d\b/, severity: 'high', label: 'init.d' },
+  { pattern: /rc\.local/, severity: 'high', label: 'rc.local' },
+  { pattern: /(?:modify|edit|add\s+to)\s+(?:the\s+)?CI\s+(?:config|pipeline|workflow)/i, severity: 'medium', label: 'CI pipeline modification' },
+];
+
+const PERSISTENCE_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-912', name: 'Hidden Functionality', url: 'https://cwe.mitre.org/data/definitions/912.html' },
+  { type: 'mitre_atlas', id: 'AML.T0011', name: 'User Execution', url: 'https://atlas.mitre.org/techniques/AML.T0011' },
+];
+
+function scanPersistenceMechanism(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of PERSISTENCE_DEFS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'persistence_mechanism',
+        title: `Persistence mechanism: ${def.label}`,
+        message: 'Agent instructions reference mechanisms that could establish persistent access or scheduled execution. Agents should not modify system startup, cron, shell profiles, or CI pipelines without explicit approval.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Remove instructions to modify persistent system configurations. Agents should not install cron jobs, modify shell profiles, add git hooks, or alter CI pipelines autonomously.',
+        references: PERSISTENCE_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// shadow_instructions
+// ---------------------------------------------------------------------------
+
+const SHADOW_INSTRUCTION_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /[A-Za-z0-9+/]{40,}={0,2}/, severity: 'medium', label: 'base64 encoded content' },
+  { pattern: /\\x[0-9a-f]{2}(?:\\x[0-9a-f]{2}){3,}/i, severity: 'high', label: 'hex-escaped content' },
+  { pattern: /\\u[0-9a-f]{4}(?:\\u[0-9a-f]{4}){3,}/i, severity: 'high', label: 'unicode-escaped content' },
+  { pattern: /<!--\s*(?:instruction|command|execute|run|do|follow)/i, severity: 'high', label: 'hidden instruction in HTML comment' },
+  { pattern: /\u200B|\u200C|\u200D|\uFEFF/, severity: 'high', label: 'zero-width characters' },
+];
+
+const SHADOW_INSTRUCTION_REFS: SecurityReference[] = [
+  { type: 'owasp_llm', id: 'LLM01', name: 'Prompt Injection', url: 'https://genai.owasp.org/llmrisk/llm01-prompt-injection/' },
+  { type: 'cwe', id: 'CWE-116', name: 'Improper Encoding or Escaping of Output', url: 'https://cwe.mitre.org/data/definitions/116.html' },
+];
+
+function scanShadowInstructions(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of SHADOW_INSTRUCTION_DEFS) {
+    if (def.pattern.test(content)) {
+      // Skip base64 false positives: only flag if it's long enough and doesn't look like a hash/commit
+      if (def.label === 'base64 encoded content') {
+        const match = content.match(def.pattern);
+        if (match && match[0].length < 60) continue; // Short b64 strings are likely hashes, not hidden instructions
+      }
+
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'shadow_instructions',
+        title: `Shadow instruction detected: ${def.label}`,
+        message: 'Agent instruction files contain obfuscated or hidden content that may not be visible during normal review. This could be used to smuggle malicious instructions past human reviewers.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Remove obfuscated content from agent instruction files. All instructions should be human-readable. Audit for zero-width characters, encoded payloads, and hidden HTML comments.',
+        references: SHADOW_INSTRUCTION_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// approval_bypass
+// ---------------------------------------------------------------------------
+
+const APPROVAL_BYPASS_PATTERNS: { pattern: RegExp; label: string }[] = [
+  { pattern: /auto.?(?:approve|merge|deploy)/i, label: 'auto-approve' },
+  { pattern: /(?:no|skip|without)\s+(?:human\s+)?(?:confirmation|approval|review)/i, label: 'skip confirmation' },
+  { pattern: /merge\s+without\s+(?:review|approval)/i, label: 'merge without review' },
+  { pattern: /deploy\s+(?:directly|immediately|without)/i, label: 'deploy without gate' },
+  { pattern: /(?:disable|remove|skip)\s+(?:code\s+)?review/i, label: 'skip code review' },
+  { pattern: /push\s+(?:directly\s+)?to\s+(?:main|master|prod)/i, label: 'push directly to main' },
+  { pattern: /--(?:no-verify|force)/i, label: '--no-verify / --force' },
+  { pattern: /force\s+push/i, label: 'force push' },
+];
+
+const APPROVAL_BYPASS_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-862', name: 'Missing Authorization', url: 'https://cwe.mitre.org/data/definitions/862.html' },
+  { type: 'owasp_llm', id: 'LLM07', name: 'Insecure Plugin Design', url: 'https://genai.owasp.org/llmrisk/llm07-insecure-plugin-design/' },
+];
+
+function scanApprovalBypass(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of APPROVAL_BYPASS_PATTERNS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: 'medium',
+        category: 'approval_bypass',
+        title: `Approval bypass: ${def.label}`,
+        message: 'Agent instructions include patterns that bypass human review, approval gates, or safety checks. Removing human-in-the-loop safeguards increases risk of unreviewed changes reaching production.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Maintain human approval gates for deployments, merges to protected branches, and security-sensitive operations. Agents should propose changes, not force them through.',
+        references: APPROVAL_BYPASS_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// insecure_defaults
+// ---------------------------------------------------------------------------
+
+const INSECURE_DEFAULT_DEFS: { pattern: RegExp; severity: 'high' | 'medium'; label: string }[] = [
+  { pattern: /--insecure\b/, severity: 'high', label: '--insecure flag' },
+  { pattern: /NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]?0/i, severity: 'high', label: 'TLS verification disabled' },
+  { pattern: /verify\s*=\s*False/i, severity: 'high', label: 'SSL verify=False' },
+  { pattern: /CURLOPT_SSL_VERIFYPEER.*false/i, severity: 'high', label: 'CURLOPT_SSL_VERIFYPEER false' },
+  { pattern: /ssl[_.]?verify\s*[:=]\s*(?:false|0|no|off)/i, severity: 'high', label: 'SSL verify disabled' },
+  { pattern: /http:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0)/i, severity: 'medium', label: 'HTTP (not HTTPS) URL' },
+  { pattern: /disable\s+(?:TLS|SSL|certificate\s+(?:check|verification))/i, severity: 'high', label: 'disable TLS' },
+  { pattern: /allow\s+(?:self.?signed|invalid)\s+cert/i, severity: 'medium', label: 'allow invalid certificates' },
+];
+
+const INSECURE_DEFAULT_REFS: SecurityReference[] = [
+  { type: 'cwe', id: 'CWE-295', name: 'Improper Certificate Validation', url: 'https://cwe.mitre.org/data/definitions/295.html' },
+  { type: 'cwe', id: 'CWE-319', name: 'Cleartext Transmission of Sensitive Information', url: 'https://cwe.mitre.org/data/definitions/319.html' },
+];
+
+function scanInsecureDefaults(file: AgentFile): SecurityFinding[] {
+  const findings: SecurityFinding[] = [];
+  const content = file.rawContent;
+
+  for (const def of INSECURE_DEFAULT_DEFS) {
+    if (def.pattern.test(content)) {
+      const ev = extractLineEvidence(content, def.pattern);
+      findings.push({
+        severity: def.severity,
+        category: 'insecure_defaults',
+        title: `Insecure default: ${def.label}`,
+        message: 'Agent instructions disable transport security or use insecure defaults. This exposes communications to man-in-the-middle attacks and credential theft.',
+        path: file.path,
+        evidence: ev?.text,
+        lineNumber: ev?.lineNumber,
+        recommendation: 'Always use HTTPS/TLS for network communications. Never disable certificate verification. Remove --insecure flags and verify=False patterns.',
+        references: INSECURE_DEFAULT_REFS,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
 // cross_file_duplicate
 // ---------------------------------------------------------------------------
 
@@ -526,6 +981,16 @@ export function runSecurityScan(
       findings.push(...scanInstructionOverride(file));
       findings.push(...scanDataExfiltration(file));
       findings.push(...scanPrivateEnvironment(file));
+      findings.push(...scanPromptInjectionSurface(file));
+      findings.push(...scanPrivilegeEscalation(file));
+      findings.push(...scanSupplyChainRisk(file));
+      findings.push(...scanSensitiveFileReference(file));
+      findings.push(...scanUnscopedNetwork(file));
+      findings.push(...scanCodeExecutionUnsandboxed(file));
+      findings.push(...scanPersistenceMechanism(file));
+      findings.push(...scanShadowInstructions(file));
+      findings.push(...scanApprovalBypass(file));
+      findings.push(...scanInsecureDefaults(file));
     }
   }
 

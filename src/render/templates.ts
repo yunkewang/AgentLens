@@ -681,6 +681,7 @@ ${groups.map(([label, severity, findings]) => findings.length === 0 ? '' : `
   <div class="finding-message">${esc(f.message)}</div>
   ${f.evidence ? `<div class="finding-evidence"><strong>Evidence:</strong> <code>${esc(f.evidence)}</code></div>` : ''}
   ${f.recommendation ? `<div class="finding-rec"><strong>Recommendation:</strong> ${esc(f.recommendation)}</div>` : ''}
+  ${f.references && f.references.length ? `<div class="finding-refs" style="margin-top:6px;font-size:11px;color:#64748B;"><strong>References:</strong> ${f.references.map((r) => r.url ? `<a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:#2563EB;text-decoration:none;">${esc(r.id)}: ${esc(r.name)}</a>` : `<span>${esc(r.id)}: ${esc(r.name)}</span>`).join(' &middot; ')}</div>` : ''}
   <div style="margin-top:10px;display:flex;gap:6px;align-items:center;">
     <button class="copy-btn" onclick="copyById('${promptId}', this)">Copy Remediation Prompt</button>
     <button class="action-btn" style="font-size:11px;padding:4px 10px;" onclick="showTab('fix-prompts')">Remediation Prompts &#8594;</button>

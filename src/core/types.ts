@@ -41,6 +41,17 @@ export interface Risk {
 
 export type FindingSource = 'agent_instruction' | 'project_doc';
 
+export interface SecurityReference {
+  /** Reference type: CWE, OWASP LLM Top 10, MITRE ATLAS */
+  type: 'cwe' | 'owasp_llm' | 'mitre_atlas';
+  /** Reference identifier (e.g., "CWE-78", "LLM01") */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** URL to the reference */
+  url?: string;
+}
+
 export interface SecurityFinding {
   severity: SecuritySeverity;
   category: string;
@@ -51,6 +62,7 @@ export interface SecurityFinding {
   lineNumber?: number;
   recommendation?: string;
   source?: FindingSource;
+  references?: SecurityReference[];
 }
 
 export interface SecuritySummary {
